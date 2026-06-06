@@ -36,9 +36,8 @@
 
 .payment-kpi-grid{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-
-  gap:20px;
+  grid-template-columns:repeat(5,1fr);
+  gap:16px;
   margin:0 32px 24px;
 }
 
@@ -129,6 +128,63 @@
 
   background:#eef4ff;
   color:#081A44;
+}
+
+.orange-card{
+  background:#ffedd5;
+  border:1px solid #fed7aa;
+  color:#ea580c;
+}
+
+.red-card{
+  background:#fee2e2;
+  border:1px solid #fecaca;
+  color:#dc2626;
+}
+
+.green-card{
+  background:#dcfce7;
+  border:1px solid #bbf7d0;
+  color:#16a34a;
+}
+
+.purple-card{
+  background:#dbeafe;
+  border:1px solid #bfdbfe;
+  color:#2563eb;
+}
+
+.profit-card{
+  background:#f3e8ff;
+  border:1px solid #e9d5ff;
+  color:#7e22ce;
+}
+
+/* ICON COLORS */
+
+.orange-icon{
+  background:#fff7ed;
+  color:#ea580c;
+}
+
+.red-icon{
+  background:#fff1f2;
+  color:#dc2626;
+}
+
+.green-icon{
+  background:#f0fdf4;
+  color:#16a34a;
+}
+
+.purple-icon{
+  background:#eff6ff;
+  color:#2563eb;
+}
+
+.profit-icon{
+  background:#faf5ff;
+  color:#9333ea;
 }
 
 /* =========================================================

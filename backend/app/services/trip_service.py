@@ -100,6 +100,8 @@ async def create_trip(
         "reporting_time": data.reporting_time,
         "notes": data.notes,
         "balance_amount": data.balance_amount,
+        "trip_cost": data.balance_amount,
+        "amount_paid": 0.0,
         "payment_status": "Pending",
         "trip_status": "Scheduled",
         "driver_msg_sent": False,

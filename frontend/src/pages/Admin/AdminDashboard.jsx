@@ -22,6 +22,7 @@ function AdminDashboard() {
     document_expiry_alerts: [],
     payments: { pending_amount: 0, overdue_amount: 0, pending_count: 0, overdue_count: 0 },
     upcoming_duties: [],
+    total_profit: 0,
   });
 
   const [activity, setActivity] = useState([]);
@@ -104,6 +105,11 @@ function AdminDashboard() {
     <div className="dashboard-icon docs">
       <FaFileAlt />
     </div>
+  </div>
+
+  <div className="card purple">
+    <h3>Total Profit</h3>
+    <p>{loading ? "—" : `₹${stats.total_profit?.toLocaleString() || 0}`}</p>
   </div>
 
 </div>

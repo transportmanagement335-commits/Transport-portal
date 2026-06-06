@@ -315,6 +315,32 @@ async def get_enriched_dashboard_stats(owner_id: str, db: AsyncIOMotorDatabase) 
             "status":         trip.get("trip_status", "Scheduled"),
         })
 
+    # 7. Total Business Profit & Loss
+    # Cash basis: Revenue = Sum of actual payments collected
+    total_revenue = 0.0
+    try:
+        rev_cursor = await db.payments.aggregate([
+            {"$match": {"owner_id": owner_id}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+        ]).to_list(length=1)
+        if rev_cursor:
+            total_revenue = rev_cursor[0].get("total", 0.0)
+    except Exception:
+        pass
+
+    total_expenses = 0.0
+    try:
+        exp_cursor = await db.expenses.aggregate([
+            {"$match": {"owner_id": owner_id}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+        ]).to_list(length=1)
+        if exp_cursor:
+            total_expenses = exp_cursor[0].get("total", 0.0)
+    except Exception:
+        pass
+
+    total_profit = total_revenue - total_expenses
+
     return {
         "total_vehicles":          total_vehicles,
         "available_vehicles":      available_vehicles,
@@ -326,4 +352,5 @@ async def get_enriched_dashboard_stats(owner_id: str, db: AsyncIOMotorDatabase) 
         "upcoming_duties":         upcoming_duties,
         "pending_documents_count": len(pending_docs_set),
         "trips_today":             trips_today,
+        "total_profit":            total_profit,
     }

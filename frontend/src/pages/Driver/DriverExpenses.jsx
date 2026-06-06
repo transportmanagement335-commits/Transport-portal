@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { expensesAPI, requireAuth, tripsAPI } from "../../api";
 
 import DriverSidebar from "../../components/Driver/DriverSidebar";
 import DriverNavbar from "../../components/Driver/DriverNavbar";
@@ -11,13 +12,42 @@ function DriverExpenses() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Backend data will come here
   const [tripExpenses, setTripExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Future backend integration
-    // loadExpenseHistory();
+    requireAuth();
+    fetchExpenses();
   }, []);
+
+  const fetchExpenses = async () => {
+    try {
+      setLoading(true);
+      const data = await expensesAPI.list();
+      
+      // Group expenses by tripId
+      const grouped = {};
+      data.forEach(e => {
+        const tId = e.trip_id || "N/A";
+        if (!grouped[tId]) {
+          grouped[tId] = {
+            tripId: tId,
+            vehicle: e.vehicle_id,
+            totalExpense: 0,
+            entries: 0
+          };
+        }
+        grouped[tId].totalExpense += e.amount;
+        grouped[tId].entries += 1;
+      });
+      
+      setTripExpenses(Object.values(grouped));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalTrips = tripExpenses.length;
 

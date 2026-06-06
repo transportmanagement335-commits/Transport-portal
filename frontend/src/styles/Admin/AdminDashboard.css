@@ -19,8 +19,8 @@
 
 .cards{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:20px;
+  grid-template-columns:repeat(5,1fr);
+  gap:18px;
   padding:0 32px;
   margin:24px 0;
 }
@@ -284,6 +284,7 @@
   color:#64748b;
 }
 
+<<<<<<< Updated upstream
 /* =========================================================
    BILLING & PAYMENTS
 ========================================================= */
@@ -458,9 +459,18 @@
   color:#64748b;
 }
 
-/* =========================================================
-   RECENT VEHICLE ACTIVITY TABLE
-========================================================= */
+/* SOFT COLORS */
+.orange{
+  background:#f97316;
+  color:white;
+}
+
+.purple{
+  background:#a855f7;
+  color:white;
+}
+
+/* TABLE */
 
 .table-section{
   background:#ffffff;

@@ -150,6 +150,7 @@ export const uploadAPI = {
 // ─── Expenses ─────────────────────────────────────────────────────────────────
 
 export const expensesAPI = {
+  list: () => apiFetch("/expenses/"),
   create: (data) => apiFetch("/expenses/", { method: "POST", body: JSON.stringify(data) }),
   getByTrip: (tripId) => apiFetch(`/expenses/?trip_id=${tripId}`),
   getByVehicle: (vehicleId) => apiFetch(`/expenses/?vehicle_id=${vehicleId}`),

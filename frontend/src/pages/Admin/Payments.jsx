@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { tripsAPI, requireAuth } from "../../api";
+import { tripsAPI, adminAPI, paymentsAPI, requireAuth } from "../../api";
 import "../../styles/Admin/Payments.css";
 
 import {
@@ -21,6 +21,7 @@ const Payments = () => {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [totalProfit, setTotalProfit] = useState(0);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -45,10 +46,14 @@ const Payments = () => {
     try {
       setLoading(true);
       setError("");
-      const tripsData = await tripsAPI.list();
+      const [tripsData, statsData] = await Promise.all([
+        tripsAPI.list(),
+        adminAPI.stats()
+      ]);
       setTrips(tripsData);
+      setTotalProfit(statsData.total_profit || 0);
     } catch (err) {
-      setError("Failed to load trips: " + err.message);
+      setError("Failed to load data: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -109,7 +114,6 @@ const Payments = () => {
     setShowPayModal(true);
   };
 
-  // Reduce balance_amount on the trip when payment is logged
   const handleLogPayment = async (e) => {
     e.preventDefault();
     const amount = parseFloat(amountReceived);
@@ -117,15 +121,17 @@ const Payments = () => {
 
     try {
       setSaving(true);
-      const newBalance = Math.max(0, (payTrip.balance_amount || 0) - amount);
-      const newStatus = newBalance === 0 ? "Paid" : "Partial";
 
-      await tripsAPI.update(payTrip.id, {
-        balance_amount: newBalance,
-        payment_status: newStatus,
+      // Save to payments collection using paymentsAPI
+      await paymentsAPI.create({
+        trip_id: payTrip.id,
+        amount_paid: amount,
+        method: payMethod,
       });
 
+      const newBalance = Math.max(0, (payTrip.balance_amount || 0) - amount);
       alert(`Payment of ₹${amount.toLocaleString()} logged! New balance: ₹${newBalance.toLocaleString()}`);
+      
       setShowPayModal(false);
       fetchData();
     } catch (err) {
@@ -199,6 +205,17 @@ const Payments = () => {
                 <h3>{trips.length}</h3>
               </div>
               <div className="payment-kpi-icon purple-icon">
+                <FiDollarSign />
+              </div>
+            </div>
+          </div>
+          <div className="payment-kpi-card profit-card">
+            <div className="payment-kpi-content">
+              <div>
+                <p className="payment-kpi-label">Total Profit</p>
+                <h3>₹{totalProfit.toLocaleString()}</h3>
+              </div>
+              <div className="payment-kpi-icon profit-icon">
                 <FiDollarSign />
               </div>
             </div>

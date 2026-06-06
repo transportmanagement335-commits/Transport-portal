@@ -116,6 +116,7 @@ class AdminStatsResponse(BaseModel):
     document_expiry_alerts: list[DocumentExpiryAlert]
     payments: PaymentSummary
     upcoming_duties: list[UpcomingDuty]
+    total_profit: float = 0.0
 
 
 class RecentActivityRow(BaseModel):

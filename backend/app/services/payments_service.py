@@ -19,23 +19,23 @@ async def add_payment(data: PaymentCreateRequest, owner_id: str, db: AsyncIOMoto
     if not trip:
         raise ValueError("Trip not found")
 
-    new_cost = data.trip_cost
-    new_paid = trip.get("amount_paid", 0.0) + data.amount_paid
-    balance = new_cost - new_paid
+    new_balance = max(0, float(trip.get("balance_amount", 0.0)) - data.amount_paid)
     
     status = "Pending"
-    if new_paid > 0 and balance > 0:
-        status = "Partial"
-    elif balance <= 0 and new_cost > 0:
+    if new_balance == 0:
         status = "Paid"
+    elif new_balance < float(trip.get("balance_amount", 0.0)):
+        status = "Partial"
+    else:
+        status = trip.get("payment_status", "Pending")
 
     # Only create transaction if amount_paid > 0
     if data.amount_paid > 0:
         payment_doc = {
             "owner_id": owner_id,
             "trip_id": str(trip["_id"]),
-            "client_name": trip["client_name"],
-            "vehicle_number": trip["vehicle_number"],
+            "client_name": trip.get("client_name", "Unknown"),
+            "vehicle_number": trip.get("vehicle_number", "Unknown"),
             "amount": data.amount_paid,
             "method": data.method,
             "transaction_id": data.transaction_id,
@@ -43,26 +43,25 @@ async def add_payment(data: PaymentCreateRequest, owner_id: str, db: AsyncIOMoto
         }
         await db.payments.insert_one(payment_doc)
 
-    # Generate payment link if there's a balance and no link exists, or cost changed
+    # Generate payment link if there's a balance and no link exists
     payment_link = trip.get("payment_link")
-    if balance > 0 and not payment_link:
-        payment_link = create_payment_link(str(trip["_id"]), balance, trip["client_name"])
+    if new_balance > 0 and not payment_link:
+        payment_link = create_payment_link(str(trip["_id"]), new_balance, trip.get("client_name", "Unknown"))
 
     # Update trip
     await db.trips.update_one(
         {"_id": trip["_id"]},
         {"$set": {
-            "trip_cost": new_cost,
-            "amount_paid": new_paid,
+            "balance_amount": new_balance,
             "payment_status": status,
             "payment_link": payment_link,
             "updated_at": datetime.utcnow()
         }}
     )
     
-    trip["trip_cost"] = new_cost
-    trip["amount_paid"] = new_paid
+    trip["balance_amount"] = new_balance
     trip["payment_status"] = status
+    trip["payment_link"] = payment_link
     
     # We return the updated trip info to the UI
     trip["id"] = str(trip.pop("_id"))

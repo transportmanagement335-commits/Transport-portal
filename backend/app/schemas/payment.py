@@ -4,9 +4,9 @@ from pydantic import BaseModel
 
 class PaymentCreateRequest(BaseModel):
     trip_id: str
-    trip_cost: float                  # To optionally update the trip's total cost
     amount_paid: float
     method: str
+    trip_cost: Optional[float] = 0.0
     transaction_id: Optional[str] = None
 
 class PaymentResponse(BaseModel):
