@@ -70,6 +70,13 @@ class TripInDB(BaseModel):
     payment_link: Optional[str] = None     # Dummy Razorpay link
     payment_status: PaymentStatus = PaymentStatus.PENDING
 
+    # ── Invoice linkage ────────────────────────────────────────────────────────
+    freight_charge: float = 0.0            # Agreed transport fee for this trip
+    billing_type: str = "post_paid"        # "post_paid" | "pre_paid" | "proforma"
+    is_invoiced: bool = False              # True once an invoice has been generated
+    invoice_id: Optional[str] = None      # ObjectId of the linked final invoice
+    proforma_invoice_id: Optional[str] = None  # ObjectId of linked proforma invoice
+
     # ── Status ─────────────────────────────────────────────────────────────────
     trip_status: TripStatus = TripStatus.SCHEDULED
 

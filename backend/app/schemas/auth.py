@@ -70,6 +70,7 @@ class DriverCreateRequest(BaseModel):
     phone: str
     password: str                       # Initial password; driver should change it
     license_number: str
+    license_image_url: Optional[str] = None
     license_expiry: Optional[datetime] = None
 
     @field_validator("email")
@@ -163,4 +164,5 @@ class UserProfileResponse(BaseModel):
     owner_id: Optional[str] = None
     assigned_truck_id: Optional[str] = None
     license_number: Optional[str] = None
+    license_image_url: Optional[str] = None
     license_expiry: Optional[datetime] = None

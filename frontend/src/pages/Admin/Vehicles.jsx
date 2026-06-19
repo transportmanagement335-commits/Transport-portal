@@ -57,6 +57,12 @@ function Vehicles() {
   const [busType, setBusType] =
     useState("");
 
+  const [busCategory, setBusCategory] =
+    useState("");
+
+  const [busLayout, setBusLayout] =
+    useState("");
+
   const [busSeater, setBusSeater] =
     useState("");
 
@@ -102,22 +108,10 @@ function Vehicles() {
       /* BUS */
 
       bus_type: "",
+      bus_category: "",
+      bus_layout: "",
       seating_capacity: "",
     });
-
-  /* =====================================================
-     INITIAL LOAD
-  ===================================================== */
-
-  useEffect(() => {
-
-    requireAuth();
-
-    fetchVehicles();
-
-    fetchDrivers();
-
-  }, []);
 
   /* =====================================================
      FETCH VEHICLES
@@ -166,6 +160,20 @@ function Vehicles() {
       setDrivers([]);
     }
   }
+
+  /* =====================================================
+     USE EFFECT (MOUNT)
+  ===================================================== */
+
+  useEffect(() => {
+
+    requireAuth();
+
+    fetchVehicles();
+
+    fetchDrivers();
+
+  }, []);
 
   /* =====================================================
      HANDLE FORM CHANGE
@@ -243,6 +251,12 @@ setVehicles((prev) => [
     bus_type:
       formData.bus_type,
 
+    bus_category:
+      formData.bus_category,
+
+    bus_layout:
+      formData.bus_layout,
+
     seating_capacity:
       formData.seating_capacity,
   },
@@ -270,6 +284,8 @@ setVehicles((prev) => [
         truck_category: "",
 
         bus_type: "",
+        bus_category: "",
+        bus_layout: "",
         seating_capacity: "",
       });
 
@@ -368,6 +384,16 @@ const busMatch =
 
       (!busType ||
         v.bus_type === busType)
+
+      &&
+
+      (!busCategory ||
+        v.bus_category === busCategory)
+
+      &&
+
+      (!busLayout ||
+        v.bus_layout === busLayout)
 
       &&
 
@@ -734,6 +760,54 @@ const busMatch =
 
                 <select
                   className="filter-dropdown"
+                  value={busCategory}
+                  onChange={(e) =>
+                    setBusCategory(
+                      e.target.value
+                    )
+                  }
+                >
+
+                  <option value="">
+                    Category
+                  </option>
+
+                  <option>
+                    Premium
+                  </option>
+
+                  <option>
+                    Standard
+                  </option>
+
+                </select>
+
+                <select
+                  className="filter-dropdown"
+                  value={busLayout}
+                  onChange={(e) =>
+                    setBusLayout(
+                      e.target.value
+                    )
+                  }
+                >
+
+                  <option value="">
+                    Layout
+                  </option>
+
+                  <option>
+                    Sleeper
+                  </option>
+
+                  <option>
+                    Seater
+                  </option>
+
+                </select>
+
+                <select
+                  className="filter-dropdown"
                   value={busSeater}
                   onChange={(e) =>
                     setBusSeater(
@@ -747,7 +821,19 @@ const busMatch =
                   </option>
 
                   <option>
+                    17 Seater
+                  </option>
+
+                  <option>
+                    26 Seater
+                  </option>
+
+                  <option>
                     40 Seater
+                  </option>
+
+                  <option>
+                    45 Seater
                   </option>
 
                   <option>
@@ -820,6 +906,8 @@ const busMatch =
 
               {[
                 busType,
+                busCategory,
+                busLayout,
                 busSeater,
               ]
                 .filter(Boolean)
@@ -845,6 +933,8 @@ const busMatch =
           setTruckCategory("");
 
           setBusType("");
+          setBusCategory("");
+          setBusLayout("");
           setBusSeater("");
         }}
       >
@@ -1124,6 +1214,62 @@ const busMatch =
                       <div className="form-group">
 
                         <label>
+                          Bus Category *
+                        </label>
+
+                        <select
+                          name="bus_category"
+                          value={formData.bus_category}
+                          onChange={handleChange}
+                        >
+
+                          <option value="">
+                            Select Category
+                          </option>
+
+                          <option value="Premium">
+                            Premium
+                          </option>
+
+                          <option value="Standard">
+                            Standard
+                          </option>
+
+                        </select>
+
+                      </div>
+
+                      <div className="form-group">
+
+                        <label>
+                          Bus Layout *
+                        </label>
+
+                        <select
+                          name="bus_layout"
+                          value={formData.bus_layout}
+                          onChange={handleChange}
+                        >
+
+                          <option value="">
+                            Select Layout
+                          </option>
+
+                          <option value="Sleeper">
+                            Sleeper
+                          </option>
+
+                          <option value="Seater">
+                            Seater
+                          </option>
+
+                        </select>
+
+                      </div>
+
+                      <div className="form-group">
+
+                        <label>
                           Seating Capacity *
                         </label>
 
@@ -1137,8 +1283,20 @@ const busMatch =
                             Select Seating Capacity
                           </option>
 
+                          <option value="17 Seater">
+                            17 Seater
+                          </option>
+
+                          <option value="26 Seater">
+                            26 Seater
+                          </option>
+
                           <option value="40 Seater">
                             40 Seater
+                          </option>
+
+                          <option value="45 Seater">
+                            45 Seater
                           </option>
 
                           <option value="49 Seater">
@@ -1491,6 +1649,12 @@ const busMatch =
         <span className="table-sub-type">
 
           {vehicle.bus_type}
+
+          {vehicle.bus_category &&
+            ` • ${vehicle.bus_category}`}
+
+          {vehicle.bus_layout &&
+            ` • ${vehicle.bus_layout}`}
 
           {vehicle.seating_capacity &&
             ` • ${vehicle.seating_capacity}`}

@@ -1,0 +1,112 @@
+/* ─── Invoices Page ───────────────────────────────────────────────────────── */
+
+.inv-header-row {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  padding: 28px 32px 20px;
+}
+.inv-page-title { margin: 0; font-size: 24px; font-weight: 700; color: #0f172a; }
+.inv-breadcrumb { font-size: 13px; color: #64748b; margin-top: 4px; }
+.inv-breadcrumb span { margin: 0 6px; }
+
+/* KPI Cards */
+.inv-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 0 32px 24px;
+}
+.inv-kpi-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.inv-kpi-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.inv-kpi-value { font-size: 24px; font-weight: 700; color: #0f172a; }
+.inv-kpi-sub   { font-size: 12px; color: #94a3b8; }
+.inv-kpi-card.red    .inv-kpi-value { color: #dc2626; }
+.inv-kpi-card.green  .inv-kpi-value { color: #16a34a; }
+.inv-kpi-card.orange .inv-kpi-value { color: #d97706; }
+
+/* Status Tabs */
+.inv-tabs {
+  display: flex; gap: 4px; padding: 0 32px 16px; flex-wrap: wrap;
+}
+.inv-tab {
+  background: none; border: 1.5px solid #e2e8f0; border-radius: 20px;
+  padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  color: #64748b; transition: all .2s;
+}
+.inv-tab:hover  { background: #f1f5f9; }
+.inv-tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+/* Filter Bar */
+.inv-filter-bar {
+  display: flex; gap: 12px; padding: 0 32px 16px; align-items: center; flex-wrap: wrap;
+}
+.inv-search-input {
+  flex: 1; min-width: 200px;
+  border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: 10px 14px; font-size: 14px; color: #0f172a; outline: none; transition: border .2s;
+}
+.inv-search-input:focus { border-color: #2563eb; }
+
+/* Table */
+.inv-table-panel {
+  margin: 0 32px 40px; background: #fff; border-radius: 14px;
+  border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.inv-table { width: 100%; border-collapse: collapse; }
+.inv-table thead tr {
+  background: #f1f5f9; text-align: left;
+  font-size: 12px; color: #475569; text-transform: uppercase; letter-spacing: .05em;
+}
+.inv-table thead th { padding: 13px 16px; font-weight: 600; }
+.inv-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background .15s; }
+.inv-table tbody tr:last-child { border-bottom: none; }
+.inv-table tbody tr:hover { background: #f8fafc; }
+.inv-table td { padding: 13px 16px; font-size: 14px; color: #374151; vertical-align: middle; }
+
+.inv-number-link {
+  font-weight: 700; color: #2563eb; text-decoration: none; cursor: pointer;
+}
+.inv-number-link:hover { text-decoration: underline; }
+.inv-amount { font-weight: 600; color: #0f172a; }
+.inv-balance-due { font-weight: 600; color: #dc2626; }
+.inv-balance-nil { font-weight: 600; color: #16a34a; }
+
+/* Action Buttons */
+.inv-actions-cell { display: flex; gap: 4px; align-items: center; }
+.inv-action-btn {
+  background: none; border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+  color: #475569; transition: all .15s; white-space: nowrap;
+  display: flex; align-items: center; gap: 4px;
+}
+.inv-action-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+.inv-action-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.inv-action-btn.primary:hover { background: #1d4ed8; }
+.inv-action-btn.danger  { color: #dc2626; }
+.inv-action-btn.danger:hover  { background: #fee2e2; border-color: #fca5a5; }
+
+/* Empty / Loading */
+.inv-empty { text-align: center; padding: 48px; color: #94a3b8; font-size: 14px; }
+
+/* Checkbox for bulk */
+.inv-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb; }
+
+/* Bulk action bar */
+.inv-bulk-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 24px; background: #eff6ff; border-top: 1px solid #bfdbfe;
+  font-size: 13px; color: #1e40af; font-weight: 600;
+}
+.inv-bulk-delete-btn {
+  background: #dc2626; color: #fff; border: none; border-radius: 6px;
+  padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.inv-bulk-delete-btn:hover { background: #b91c1c; }

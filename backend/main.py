@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import close_mongo_connection, connect_to_mongo
-from app.routes import auth, admin, vehicles, driver, trips, expenses, payments, upload
+from app.routes import auth, admin, vehicles, driver, trips, expenses, payments, upload, customers, invoices
 from app.services.scheduler_service import start_scheduler, stop_scheduler
 from fastapi.staticfiles import StaticFiles
 import os
@@ -61,13 +61,18 @@ Backend API for managing transport fleets, drivers, and operations.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",    # Next.js dev
-        "http://localhost:5173",    # Vite/React dev
+        "http://localhost:3000",      # Next.js dev
+        "http://localhost:5173",      # Vite/React dev
         "http://localhost:8080",
+        "http://127.0.0.1:3000",     # 127.0.0.1 variants (browsers vary)
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8080",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
 
@@ -83,6 +88,8 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(driver.router, prefix="/api/driver", tags=["Driver"])
 app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
 app.include_router(upload.router, prefix="/api/upload", tags=["Upload"])
+app.include_router(customers.router, prefix="/api/customers", tags=["Customers"])
+app.include_router(invoices.router, prefix="/api/invoices", tags=["Invoices"])
 
 # Mount uploads directory for serving static files
 UPLOAD_DIR = "uploads"

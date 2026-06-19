@@ -38,6 +38,7 @@ class UserInDB(BaseModel):
     owner_id: Optional[str] = None          # ObjectId of the owning owner (required for drivers)
     assigned_truck_id: Optional[str] = None # ObjectId of the currently assigned truck
     license_number: Optional[str] = None    # Driver's license number
+    license_image_url: Optional[str] = None
     license_expiry: Optional[datetime] = None
 
     model_config = {

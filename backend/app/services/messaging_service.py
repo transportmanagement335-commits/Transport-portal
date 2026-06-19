@@ -16,28 +16,23 @@ logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Core WhatsApp sender — POSTs to n8n webhook
+# Core WhatsApp sender — POSTs to Meta Graph API
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _send_whatsapp(to_phone: str, body: str) -> bool:
     """
-    Send a WhatsApp message via n8n.
-
-    Payload sent to n8n:
-        { "to": "whatsapp:+91XXXXXXXXXX", "message": "..." }
-
-    In your n8n WhatsApp node, map:
-        To      →  {{ $json.body.to }}
-        Message →  {{ $json.body.message }}
-
-    Returns True on success, False on failure.
+    Send a WhatsApp message via Meta Graph API (WhatsApp Business API).
     """
     try:
         import requests
+        import re
         from app.config import settings
 
-        # Use the raw phone number without prefix
-        wa_to = to_phone
+        # Clean phone number (add 91 if 10 digits)
+        digits = re.sub(r"\D", "", to_phone)
+        if len(digits) == 10:
+            digits = "91" + digits
+        wa_to = digits
 
         # Print to terminal for local debugging
         print("\n" + "="*55)
@@ -46,29 +41,39 @@ def _send_whatsapp(to_phone: str, body: str) -> bool:
         print(body)
         print("="*55 + "\n")
 
-        webhook_url = getattr(settings, "N8N_WEBHOOK_URL", None)
+        token = getattr(settings, "WHATSAPP_API_TOKEN", None)
+        phone_number_id = getattr(settings, "WHATSAPP_PHONE_NUMBER_ID", None)
 
-        if not webhook_url or webhook_url == "your_n8n_webhook_url_here":
-            logger.warning("N8N_WEBHOOK_URL not set. Message printed to terminal only.")
+        if not token or not phone_number_id:
+            logger.warning("WHATSAPP_API_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set. Message printed to terminal only.")
             return True
 
+        url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        
         payload = {
+            "messaging_product": "whatsapp",
             "to": wa_to,
-            "message": body,
+            "type": "text",
+            "text": {"preview_url": False, "body": body},
         }
 
-        response = requests.post(webhook_url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
 
         if response.status_code in (200, 201):
-            logger.info(f"WhatsApp sent to {wa_to} via n8n | Status: {response.status_code}")
+            logger.info(f"WhatsApp sent to {wa_to} via Meta API | Status: {response.status_code}")
             return True
         else:
-            logger.error(f"n8n webhook failed for {wa_to}: {response.status_code} - {response.text}")
+            logger.error(f"Meta Graph API failed for {wa_to}: {response.status_code} - {response.text}")
             return False
 
     except Exception as e:
         logger.error(f"Failed to send WhatsApp to {to_phone}: {e}")
         return False
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -215,15 +215,21 @@ async def get_enriched_dashboard_stats(owner_id: str, db: AsyncIOMotorDatabase) 
     maintenance_vehicles = await db.vehicles.count_documents({"owner_id": owner_id, "status": "Maintenance"})
     total_vehicles = available_vehicles + booked_vehicles + maintenance_vehicles
 
-    # 2. Type distribution
-    pipeline = [
-        {"$match": {"owner_id": owner_id}},
-        {"$group": {"_id": "$type", "count": {"$sum": 1}}}
-    ]
     type_distribution = {}
-    async for doc in db.vehicles.aggregate(pipeline):
-        t = doc["_id"] or "Unknown"
-        type_distribution[t] = doc["count"]
+    async for doc in db.vehicles.find({"owner_id": owner_id}):
+        base_type = doc.get("type") or "Unknown"
+        if base_type == "Bus":
+            bt = doc.get("bus_type", "")
+            bc = doc.get("bus_category", "")
+            subtype = f"Bus - {bt} {bc}".strip() if (bt or bc) else "Bus"
+        elif base_type == "Truck":
+            tc = doc.get("truck_category", "")
+            ts = doc.get("truck_size", "")
+            subtype = f"Truck - {tc} {ts}".strip() if (tc or ts) else "Truck"
+        else:
+            subtype = base_type
+            
+        type_distribution[subtype] = type_distribution.get(subtype, 0) + 1
 
     # 3. Document Expiry Alerts (Insurance, Permit, Fitness, PUC)
     today_date = date.today()
@@ -316,12 +322,26 @@ async def get_enriched_dashboard_stats(owner_id: str, db: AsyncIOMotorDatabase) 
         })
 
     # 7. Total Business Profit & Loss
-    # Cash basis: Revenue = Sum of actual payments collected
+    # Accrual basis: Revenue = Sum of total trip values (trip_cost or balance_amount + amount_paid)
     total_revenue = 0.0
     try:
-        rev_cursor = await db.payments.aggregate([
+        rev_cursor = await db.trips.aggregate([
             {"$match": {"owner_id": owner_id}},
-            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+            {"$group": {
+                "_id": None, 
+                "total": {
+                    "$sum": {
+                        "$cond": [
+                            {"$gt": [{"$type": "$trip_cost"}, "missing"]},
+                            "$trip_cost",
+                            {"$add": [
+                                {"$ifNull": ["$balance_amount", 0.0]},
+                                {"$ifNull": ["$amount_paid", 0.0]}
+                            ]}
+                        ]
+                    }
+                }
+            }}
         ]).to_list(length=1)
         if rev_cursor:
             total_revenue = rev_cursor[0].get("total", 0.0)

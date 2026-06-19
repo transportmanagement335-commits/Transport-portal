@@ -66,6 +66,11 @@ class LocationUpdateRequest(BaseModel):
     lat: float
     lng: float
 
+class FreightDocsUpdateRequest(BaseModel):
+    """Body for PUT /api/trips/{id}/freight-docs."""
+    eway_bill: Optional[str] = None
+    gr_number: Optional[str] = None
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Response schema
@@ -87,6 +92,8 @@ class TripResponse(BaseModel):
     drop_location: str
     reporting_time: datetime
     balance_amount: float = 0.0
+    amount_paid: float = 0.0
+    trip_cost: float = 0.0
     payment_link: Optional[str] = None
     payment_status: str
     trip_status: str
@@ -115,3 +122,10 @@ class TripResponse(BaseModel):
     driver_lat: Optional[float] = None
     driver_lng: Optional[float] = None
     location_updated_at: Optional[datetime] = None
+
+    # Invoice linkage
+    is_invoiced: bool = False
+    invoice_id: Optional[str] = None
+    freight_charge: float = 0.0
+    billing_type: str = "post_paid"
+    proforma_invoice_id: Optional[str] = None

@@ -26,3 +26,11 @@ class ExpenseResponse(BaseModel):
     location_lng: Optional[float] = None
     recorded_by: str
     created_at: datetime
+
+class VerifyReceiptRequest(BaseModel):
+    amount: float
+    receipt_url: str
+
+class VerifyReceiptResponse(BaseModel):
+    match: bool
+    extracted_amount: Optional[float] = None

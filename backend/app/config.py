@@ -12,6 +12,17 @@ class Settings(BaseSettings):
 
     N8N_WEBHOOK_URL: str = ""
 
+    # ── Public server URL (used to build PDF download links) ──────────────────
+    APP_BASE_URL: str = "http://localhost:8000"
+
+    # ── WhatsApp Business API (Meta Graph API) ────────────────────────────────
+    WHATSAPP_API_TOKEN: str = ""          # Bearer token from Meta Business
+    WHATSAPP_PHONE_NUMBER_ID: str = ""   # Phone Number ID from WhatsApp dashboard
+
+    # ── Invoice defaults ──────────────────────────────────────────────────────
+    DEFAULT_TAX_RATE: float = 0.0        # Default GST / tax rate (%)
+    DEFAULT_PAYMENT_TERMS_DAYS: int = 30 # Default payment due days
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

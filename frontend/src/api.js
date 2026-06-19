@@ -152,6 +152,7 @@ export const uploadAPI = {
 export const expensesAPI = {
   list: () => apiFetch("/expenses/"),
   create: (data) => apiFetch("/expenses/", { method: "POST", body: JSON.stringify(data) }),
+  verifyReceipt: (data) => apiFetch("/expenses/verify-receipt", { method: "POST", body: JSON.stringify(data) }),
   getByTrip: (tripId) => apiFetch(`/expenses/?trip_id=${tripId}`),
   getByVehicle: (vehicleId) => apiFetch(`/expenses/?vehicle_id=${vehicleId}`),
   delete: (id) => apiFetch(`/expenses/${id}`, { method: "DELETE" }),
@@ -195,6 +196,7 @@ export const tripsAPI = {
   get:            (id)       => apiFetch(`/trips/${id}`),
   create:         (body)     => apiFetch("/trips/", { method: "POST", body: JSON.stringify(body) }),
   update:         (id, body) => apiFetch(`/trips/${id}`, { method: "PUT",  body: JSON.stringify(body) }),
+  updateFreightDocs: (id, body) => apiFetch(`/trips/${id}/freight-docs`, { method: "PUT", body: JSON.stringify(body) }),
   cancel:         (id)       => apiFetch(`/trips/${id}`, { method: "DELETE" }),
   deleteAll:      ()         => apiFetch("/trips/all", { method: "DELETE" }),
   addDutyLog:     (id, body) => apiFetch(`/trips/${id}/duty-log`, { method: "POST", body: JSON.stringify(body) }),
@@ -207,4 +209,36 @@ export const paymentsAPI = {
   list:   ()       => apiFetch("/payments/"),
   create: (body)   => apiFetch("/payments/", { method: "POST", body: JSON.stringify(body) }),
   delete: (id)     => apiFetch(`/payments/${id}`, { method: "DELETE" }),
+};
+
+// ─── Customers ────────────────────────────────────────────────────────────────
+
+export const customersAPI = {
+  list:   ()         => apiFetch("/customers/"),
+  get:    (id)       => apiFetch(`/customers/${id}`),
+  create: (body)     => apiFetch("/customers/", { method: "POST", body: JSON.stringify(body) }),
+  update: (id, body) => apiFetch(`/customers/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  delete: (id)       => apiFetch(`/customers/${id}`, { method: "DELETE" }),
+};
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
+
+export const invoicesAPI = {
+  stats:           ()             => apiFetch("/invoices/stats"),
+  overdue:         ()             => apiFetch("/invoices/overdue"),
+  list:            (params = {})  => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ""))
+    ).toString();
+    return apiFetch(`/invoices/${qs ? "?" + qs : ""}`);
+  },
+  get:             (id)           => apiFetch(`/invoices/${id}`),
+  create:          (body)         => apiFetch("/invoices/", { method: "POST", body: JSON.stringify(body) }),
+  update:          (id, body)     => apiFetch(`/invoices/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  send:            (id)           => apiFetch(`/invoices/${id}/send`, { method: "POST" }),
+  sendWhatsApp:    (id)           => apiFetch(`/invoices/send-whatsapp/${id}`, { method: "POST" }),
+  recordPayment:   (id, body)     => apiFetch(`/invoices/${id}/payment`, { method: "POST", body: JSON.stringify(body) }),
+  delete:          (id)           => apiFetch(`/invoices/${id}`, { method: "DELETE" }),
+  fromTrip:        (tripId)       => apiFetch(`/invoices/from-trip/${tripId}`, { method: "POST" }),
+  convertProforma: (id, body)     => apiFetch(`/invoices/convert-proforma/${id}`, { method: "POST", body: JSON.stringify(body) }),
 };

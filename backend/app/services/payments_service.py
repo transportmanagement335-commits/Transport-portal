@@ -48,11 +48,14 @@ async def add_payment(data: PaymentCreateRequest, owner_id: str, db: AsyncIOMoto
     if new_balance > 0 and not payment_link:
         payment_link = create_payment_link(str(trip["_id"]), new_balance, trip.get("client_name", "Unknown"))
 
+    new_amount_paid = float(trip.get("amount_paid", 0.0)) + data.amount_paid
+
     # Update trip
     await db.trips.update_one(
         {"_id": trip["_id"]},
         {"$set": {
             "balance_amount": new_balance,
+            "amount_paid": new_amount_paid,
             "payment_status": status,
             "payment_link": payment_link,
             "updated_at": datetime.utcnow()
@@ -60,6 +63,7 @@ async def add_payment(data: PaymentCreateRequest, owner_id: str, db: AsyncIOMoto
     )
     
     trip["balance_amount"] = new_balance
+    trip["amount_paid"] = new_amount_paid
     trip["payment_status"] = status
     trip["payment_link"] = payment_link
     

@@ -6,7 +6,7 @@ import "leaflet/dist/leaflet.css";
 
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { tripsAPI, expensesAPI, vehiclesAPI, WS_BASE_URL, SERVER_URL, requireAuth } from "../../api";
+import { tripsAPI, expensesAPI, vehiclesAPI, invoicesAPI, WS_BASE_URL, SERVER_URL, requireAuth } from "../../api";
 import "../../styles/Admin/AdminDashboard.css";
 import "../../styles/Admin/Trips.css";
 import "../../styles/Admin/TripDetails.css";
@@ -61,7 +61,7 @@ async function geocode(address) {
     const res = await fetch(url, { headers: { "Accept-Language": "en" } });
     const data = await res.json();
     if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch {}
+  } catch (err) { console.error(err); }
   return null;
 }
 
@@ -77,7 +77,7 @@ async function fetchRoute(from, to) {
     if (data.code === "Ok" && data.routes?.[0]) {
       return data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
     }
-  } catch {}
+  } catch (err) { console.error(err); }
   return [];
 }
 
@@ -115,6 +115,7 @@ function TripDetails() {
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState("");
   const [tripData, setTripData]       = useState(passedTrip);
+  const [invoiceGenerating, setInvoiceGenerating] = useState(false);
 
   // ── Live tracking ────────────────────────────────────────
   const [driverPos, setDriverPos]         = useState(null); // { lat, lng }
@@ -137,6 +138,55 @@ function TripDetails() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [expenseForm, setExpenseForm]       = useState({ category: "Fuel", amount: "", notes: "" });
   const [expenseSaving, setExpenseSaving]   = useState(false);
+
+  // ── Freight Docs ─────────────────────────────────────────────────────────
+  const [freightDocsMode, setFreightDocsMode] = useState(false);
+  const [freightSaving, setFreightSaving]     = useState(false);
+  const [freightForm, setFreightForm]         = useState({ eway_bill: "", gr_number: "" });
+  const [freightErrors, setFreightErrors]     = useState({});
+
+  useEffect(() => {
+    if (tripData) {
+      setFreightForm({ eway_bill: tripData.eway_bill || "", gr_number: tripData.gr_number || "" });
+    }
+  }, [tripData]);
+
+  const validateFreightDocs = (field, value) => {
+    let err = "";
+    if (field === "eway_bill" && value) {
+      if (!/^\d{12}$/.test(value)) err = "E-way bill must be exactly 12 digits.";
+    }
+    if (field === "gr_number" && value) {
+      if (value.length < 3 || value.length > 50) err = "GR number must be between 3 and 50 characters.";
+    }
+    setFreightErrors(prev => ({ ...prev, [field]: err }));
+    return err;
+  };
+
+  const handleFreightChange = (field, value) => {
+    setFreightForm(prev => ({ ...prev, [field]: value }));
+    validateFreightDocs(field, value);
+  };
+
+  const saveFreightDocs = async () => {
+    const eErr = validateFreightDocs("eway_bill", freightForm.eway_bill);
+    const gErr = validateFreightDocs("gr_number", freightForm.gr_number);
+    if (eErr || gErr) return;
+
+    try {
+      setFreightSaving(true);
+      const updated = await tripsAPI.updateFreightDocs(tripData.id, {
+        eway_bill: freightForm.eway_bill || null,
+        gr_number: freightForm.gr_number || null
+      });
+      setTripData(updated);
+      setFreightDocsMode(false);
+    } catch (err) {
+      alert("Failed to save freight docs: " + err.message);
+    } finally {
+      setFreightSaving(false);
+    }
+  };
 
   // ── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -195,7 +245,7 @@ function TripDetails() {
         setDriverPos({ lat, lng });
         setLastUpdated(ts);
         setGpsStatus("live");
-      } catch {}
+      } catch (err) { console.error(err); }
     };
 
     ws.onerror = () => setGpsStatus("stale");
@@ -236,8 +286,6 @@ function TripDetails() {
         payment_status:  tripData.payment_status,
         trip_status:     tripData.trip_status,
         notes:           tripData.notes,
-        gr_number:       tripData.gr_number,
-        eway_bill:       tripData.eway_bill,
         permit_number:   tripData.permit_number,
         passing_info:    tripData.passing_info,
       });
@@ -247,6 +295,19 @@ function TripDetails() {
       setError("Failed to save: " + err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ── Auto-Generate Invoice ──────────────────────────────────────────────────
+  async function handleGenerateInvoice() {
+    try {
+      setInvoiceGenerating(true);
+      const invoice = await invoicesAPI.fromTrip(tripData.id);
+      navigate(`/invoices/${invoice.id}`);
+    } catch (err) {
+      alert("Failed to generate invoice: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setInvoiceGenerating(false);
     }
   }
 
@@ -328,7 +389,7 @@ function TripDetails() {
   );
 
   const vehicleType = tripData.vehicle_type || "";
-  const showTruckPanel = isTruck(vehicleType) || tripData.gr_number;
+  const showTruckPanel = isTruck(vehicleType);
   const showBusPanel   = isBus(vehicleType) || tripData.permit_number;
 
   const mapCenter = driverPos
@@ -352,6 +413,16 @@ function TripDetails() {
           </div>
           <div className="trips-header-actions">
             <button className="btn-danger" onClick={() => navigate("/trips")}>← Back</button>
+            {tripData.trip_status === "Completed" && (
+              <button 
+                className="btn-primary" 
+                style={{ backgroundColor: "#10b981" }} 
+                onClick={handleGenerateInvoice} 
+                disabled={invoiceGenerating}
+              >
+                {invoiceGenerating ? "Generating..." : "🧾 Generate Invoice"}
+              </button>
+            )}
             <button className="btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : editMode ? "Save Changes" : "Edit Trip"}
             </button>
@@ -603,53 +674,96 @@ function TripDetails() {
               </strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", fontSize: "16px" }}>
-              <strong style={{ color: "#1e293b" }}>Revenue (Balance Amount)</strong>
+              <strong style={{ color: "#1e293b" }}>Total Revenue</strong>
               <strong style={{ color: "#10b981" }}>
-                ₹{(parseFloat(tripData.balance_amount) || 0).toLocaleString()}
+                ₹{(parseFloat(tripData.trip_cost) || (parseFloat(tripData.balance_amount) || 0) + (parseFloat(tripData.amount_paid) || 0)).toLocaleString()}
               </strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", fontSize: "14px" }}>
+              <span style={{ color: "#64748b" }}>Amount Paid: ₹{(parseFloat(tripData.amount_paid) || 0).toLocaleString()}</span>
+              <span style={{ color: "#64748b" }}>Balance: ₹{(parseFloat(tripData.balance_amount) || 0).toLocaleString()}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", padding: "12px", backgroundColor: "#eff6ff", borderRadius: "6px", fontSize: "18px" }}>
               <strong style={{ color: "#1e293b" }}>Auto-Profit</strong>
-              <strong style={{ color: ((parseFloat(tripData.balance_amount) || 0) - expenses.reduce((sum, e) => sum + e.amount, 0)) >= 0 ? "#10b981" : "#ef4444" }}>
-                ₹{((parseFloat(tripData.balance_amount) || 0) - expenses.reduce((sum, e) => sum + e.amount, 0)).toLocaleString()}
+              <strong style={{ color: ((parseFloat(tripData.trip_cost) || (parseFloat(tripData.balance_amount) || 0) + (parseFloat(tripData.amount_paid) || 0)) - expenses.reduce((sum, e) => sum + e.amount, 0)) >= 0 ? "#10b981" : "#ef4444" }}>
+                ₹{((parseFloat(tripData.trip_cost) || (parseFloat(tripData.balance_amount) || 0) + (parseFloat(tripData.amount_paid) || 0)) - expenses.reduce((sum, e) => sum + e.amount, 0)).toLocaleString()}
               </strong>
             </div>
           </div>
         </div>
 
-        {/* ── GR & E-way Bill Panel (trucks only) ── */}
+        {/* ── Freight Documentation Panel (trucks only) ── */}
         {showTruckPanel && (
-          <div className="td-extra-panel">
-            <div className="td-extra-header">
-              <span className="td-extra-icon">📦</span>
+          <div className="td-extra-panel" style={{ border: "1px solid #cbd5e1" }}>
+            <div className="td-extra-header" style={{ borderBottom: "1px solid #e2e8f0", paddingBottom: "12px", marginBottom: "16px" }}>
+              <span className="td-extra-icon" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>📄</span>
               <div>
-                <h2>GR Number &amp; E-way Bill</h2>
-                <p>Auto-generated goods receipt and electronic waybill for this truck trip.</p>
+                <h2 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  Freight Documentation
+                  {(!tripData.eway_bill || !tripData.gr_number) && <span style={{ fontSize: "12px", padding: "2px 8px", background: "#fef3c7", color: "#d97706", borderRadius: "12px", fontWeight: 600 }}>Action Required</span>}
+                </h2>
+                <p>Official logistics documents for checkpost verification.</p>
               </div>
-            </div>
-            <div className="td-doc-grid">
-              <div className="td-doc-box gr">
-                <div className="td-doc-label">GR Number</div>
-                {editMode ? (
-                  <input
-                    className="t-input"
-                    value={tripData.gr_number || ""}
-                    onChange={(e) => setTripData({ ...tripData, gr_number: e.target.value })}
-                  />
+              <div style={{ marginLeft: "auto" }}>
+                {freightDocsMode ? (
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button className="btn-danger" onClick={() => { setFreightDocsMode(false); setFreightForm({ eway_bill: tripData.eway_bill || "", gr_number: tripData.gr_number || "" }); setFreightErrors({}); }} disabled={freightSaving}>Cancel</button>
+                    <button className="btn-primary" onClick={saveFreightDocs} disabled={freightSaving}>{freightSaving ? "Saving..." : "Save Docs"}</button>
+                  </div>
                 ) : (
-                  <div className="td-doc-value">{tripData.gr_number || "—"}</div>
+                  <button className="btn-trip" onClick={() => setFreightDocsMode(true)}>Edit</button>
                 )}
               </div>
-              <div className="td-doc-box eway">
-                <div className="td-doc-label">E-way Bill</div>
-                {editMode ? (
-                  <input
-                    className="t-input"
-                    value={tripData.eway_bill || ""}
-                    onChange={(e) => setTripData({ ...tripData, eway_bill: e.target.value })}
-                  />
+            </div>
+            
+            <div className="td-doc-grid">
+              {/* E-way Bill */}
+              <div className="td-doc-box eway" style={{ background: "white", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                <div className="td-doc-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  E-way Bill Number
+                  <span title="This is a government-issued 12-digit number from ewaybillgst.gov.in. As a software provider, we do not generate this — your transport company must obtain it from the GST portal." style={{ cursor: "help", color: "#94a3b8" }}>ℹ️</span>
+                </div>
+                {freightDocsMode ? (
+                  <div style={{ marginTop: "8px" }}>
+                    <input
+                      className="t-input"
+                      value={freightForm.eway_bill}
+                      onChange={(e) => handleFreightChange("eway_bill", e.target.value)}
+                      placeholder="Enter 12-digit E-way Bill from GST portal"
+                      style={{ borderColor: freightErrors.eway_bill ? "#ef4444" : "#e2e8f0", width: "100%" }}
+                    />
+                    {freightErrors.eway_bill && <div style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px" }}>{freightErrors.eway_bill}</div>}
+                  </div>
                 ) : (
-                  <div className="td-doc-value">{tripData.eway_bill || "—"}</div>
+                  <div className="td-doc-value" style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    {tripData.eway_bill || <span style={{ color: "#94a3b8", fontWeight: 400 }}>Not entered</span>}
+                    {tripData.eway_bill?.startsWith("EWB-DEMO") && <span style={{ fontSize: "10px", padding: "2px 6px", background: "#f1f5f9", color: "#64748b", borderRadius: "4px" }}>DEMO DATA</span>}
+                  </div>
+                )}
+              </div>
+              
+              {/* GR Number */}
+              <div className="td-doc-box gr" style={{ background: "white", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                <div className="td-doc-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  GR / LR Number
+                  <span title="This is the Lorry Receipt (LR) number provided by your transporter when goods are picked up." style={{ cursor: "help", color: "#94a3b8" }}>ℹ️</span>
+                </div>
+                {freightDocsMode ? (
+                  <div style={{ marginTop: "8px" }}>
+                    <input
+                      className="t-input"
+                      value={freightForm.gr_number}
+                      onChange={(e) => handleFreightChange("gr_number", e.target.value)}
+                      placeholder="Enter LR number from transporter receipt"
+                      style={{ borderColor: freightErrors.gr_number ? "#ef4444" : "#e2e8f0", width: "100%" }}
+                    />
+                    {freightErrors.gr_number && <div style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px" }}>{freightErrors.gr_number}</div>}
+                  </div>
+                ) : (
+                  <div className="td-doc-value" style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    {tripData.gr_number || <span style={{ color: "#94a3b8", fontWeight: 400 }}>Not entered</span>}
+                    {tripData.gr_number?.startsWith("GR-DEMO") && <span style={{ fontSize: "10px", padding: "2px 6px", background: "#f1f5f9", color: "#64748b", borderRadius: "4px" }}>DEMO DATA</span>}
+                  </div>
                 )}
               </div>
             </div>

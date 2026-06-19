@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { tripsAPI, adminAPI, paymentsAPI, requireAuth } from "../../api";
+import { invoicesAPI, tripsAPI, paymentsAPI, adminAPI, requireAuth } from "../../api";
 import "../../styles/Admin/Payments.css";
 
 import {
@@ -18,6 +18,7 @@ const Payments = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Data State
+  const [invoices, setInvoices] = useState([]);
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +33,7 @@ const Payments = () => {
 
   // "Log Payment" modal state
   const [showPayModal, setShowPayModal] = useState(false);
-  const [payTrip, setPayTrip] = useState(null);       // trip object selected
+  const [payItem, setPayItem] = useState(null);       // mixed item selected
   const [amountReceived, setAmountReceived] = useState("");
   const [payMethod, setPayMethod] = useState("Cash");
   const [saving, setSaving] = useState(false);
@@ -46,10 +47,12 @@ const Payments = () => {
     try {
       setLoading(true);
       setError("");
-      const [tripsData, statsData] = await Promise.all([
+      const [invoicesData, tripsData, statsData] = await Promise.all([
+        invoicesAPI.list(),
         tripsAPI.list(),
         adminAPI.stats()
       ]);
+      setInvoices(invoicesData);
       setTrips(tripsData);
       setTotalProfit(statsData.total_profit || 0);
     } catch (err) {
@@ -66,15 +69,73 @@ const Payments = () => {
     }));
   };
 
-  // Group Trips by Client using actual DB field: balance_amount
+  // Group Ledger Items by Client
   const clientGroups = useMemo(() => {
     const groups = {};
-    trips.forEach((trip) => {
-      const clientKey = `${trip.client_name}__${trip.client_phone}`;
+
+    const getGroup = (name, phone) => {
+      const clientKey = `${name}__${phone}`;
+      if (!groups[clientKey]) {
+        groups[clientKey] = {
+          client_name: name,
+          client_phone: phone,
+          total_value: 0,
+          total_paid: 0,
+          total_balance: 0,
+          items: [],
+        };
+      }
+      return groups[clientKey];
+    };
+
+    // 1. Process Invoices
+    invoices.forEach((invoice) => {
+      const name = invoice.recipient_details?.name || "Unknown Client";
+      const phone = invoice.recipient_details?.phone || "N/A";
 
       const matchesSearch =
-        trip.client_name?.toLowerCase().includes(search.toLowerCase()) ||
-        trip.client_phone?.toLowerCase().includes(search.toLowerCase()) ||
+        name.toLowerCase().includes(search.toLowerCase()) ||
+        phone.toLowerCase().includes(search.toLowerCase()) ||
+        invoice.invoice_number?.toLowerCase().includes(search.toLowerCase());
+
+      const matchesStatus =
+        selectedStatus === "All Status"
+          ? true
+          : invoice.status === selectedStatus;
+
+      if (matchesSearch && matchesStatus) {
+        const group = getGroup(name, phone);
+        const balance = Math.max(0, (invoice.total_amount || 0) - (invoice.paid_amount || 0));
+        
+        group.items.push({
+          type: "invoice",
+          id: invoice.id,
+          reference: invoice.invoice_number,
+          date: invoice.issue_date,
+          item_desc: invoice.trip_id ? `Trip: ${invoice.trip_id}` : "Multiple/No Trip",
+          total: invoice.total_amount || 0,
+          paid: invoice.paid_amount || 0,
+          balance: balance,
+          status: invoice.status || "Draft",
+          original: invoice
+        });
+
+        group.total_value += (invoice.total_amount || 0);
+        group.total_paid += (invoice.paid_amount || 0);
+        group.total_balance += balance;
+      }
+    });
+
+    // 2. Process Un-invoiced Trips
+    trips.forEach((trip) => {
+      if (trip.is_invoiced || trip.invoice_id) return;
+
+      const name = trip.client_name || "Unknown Client";
+      const phone = trip.client_phone || "N/A";
+
+      const matchesSearch =
+        name.toLowerCase().includes(search.toLowerCase()) ||
+        phone.toLowerCase().includes(search.toLowerCase()) ||
         trip.trip_id?.toLowerCase().includes(search.toLowerCase());
 
       const matchesStatus =
@@ -83,32 +144,47 @@ const Payments = () => {
           : trip.payment_status === selectedStatus;
 
       if (matchesSearch && matchesStatus) {
-        if (!groups[clientKey]) {
-          groups[clientKey] = {
-            client_name: trip.client_name,
-            client_phone: trip.client_phone,
-            total_balance: 0,
-            trips: [],
-          };
-        }
-        groups[clientKey].trips.push(trip);
-        groups[clientKey].total_balance += trip.balance_amount || 0;
+        const group = getGroup(name, phone);
+        const tripTotal = trip.trip_cost || trip.balance_amount || 0;
+        const tripPaid = trip.amount_paid || 0;
+        const balance = trip.balance_amount || 0;
+
+        group.items.push({
+          type: "trip",
+          id: trip.id,
+          reference: trip.trip_id || `Trip ${trip.id.substring(0,6)}`,
+          date: trip.created_at || trip.reporting_time,
+          item_desc: "Un-invoiced Trip",
+          total: tripTotal,
+          paid: tripPaid,
+          balance: balance,
+          status: trip.payment_status || "Pending",
+          original: trip
+        });
+
+        group.total_value += tripTotal;
+        group.total_paid += tripPaid;
+        group.total_balance += balance;
       }
     });
+
     return groups;
-  }, [trips, search, selectedStatus]);
+  }, [invoices, trips, search, selectedStatus]);
 
-  // KPI Totals — all based on balance_amount (single financial field in DB)
-  const totalBalance = trips.reduce((s, t) => s + (t.balance_amount || 0), 0);
-  const tripsWithBalance = trips.filter((t) => (t.balance_amount || 0) > 0).length;
-  const tripsSettled = trips.filter(
-    (t) => t.payment_status === "Paid" || (t.balance_amount || 0) === 0
-  ).length;
+  // KPI Totals
+  const allItems = useMemo(() => {
+    return Object.values(clientGroups).flatMap(g => g.items);
+  }, [clientGroups]);
 
-  // Open modal pre-filled with the selected trip
-  const openPayModal = (e, trip) => {
+  const totalLedgerValue = allItems.reduce((s, i) => s + i.total, 0);
+  const totalCollected = allItems.reduce((s, i) => s + i.paid, 0);
+  const totalBalance = allItems.reduce((s, i) => s + i.balance, 0);
+  const itemsSettled = allItems.filter(i => i.balance <= 0 || i.status === "Paid" || i.status === "Settled").length;
+
+  // Open modal pre-filled with the selected item
+  const openPayModal = (e, item) => {
     e.stopPropagation();
-    setPayTrip(trip);
+    setPayItem(item);
     setAmountReceived("");
     setPayMethod("Cash");
     setShowPayModal(true);
@@ -122,14 +198,21 @@ const Payments = () => {
     try {
       setSaving(true);
 
-      // Save to payments collection using paymentsAPI
-      await paymentsAPI.create({
-        trip_id: payTrip.id,
-        amount_paid: amount,
-        method: payMethod,
-      });
+      if (payItem.type === "invoice") {
+        await invoicesAPI.recordPayment(payItem.id, {
+          amount: amount,
+          method: payMethod,
+        });
+      } else {
+        await paymentsAPI.create({
+          trip_id: payItem.id,
+          amount_paid: amount,
+          method: payMethod,
+        });
+      }
 
-      const newBalance = Math.max(0, (payTrip.balance_amount || 0) - amount);
+      const currentBalance = payItem.balance;
+      const newBalance = Math.max(0, currentBalance - amount);
       alert(`Payment of ₹${amount.toLocaleString()} logged! New balance: ₹${newBalance.toLocaleString()}`);
       
       setShowPayModal(false);
@@ -168,41 +251,41 @@ const Payments = () => {
           <div className="payment-kpi-card orange-card">
             <div className="payment-kpi-content">
               <div>
-                <p className="payment-kpi-label">Total Outstanding</p>
-                <h3>₹{totalBalance.toLocaleString()}</h3>
+                <p className="payment-kpi-label">Total Ledger Value</p>
+                <h3>₹{totalLedgerValue.toLocaleString()}</h3>
               </div>
               <div className="payment-kpi-icon orange-icon">
                 <FiDollarSign />
               </div>
             </div>
           </div>
-          <div className="payment-kpi-card red-card">
-            <div className="payment-kpi-content">
-              <div>
-                <p className="payment-kpi-label">Trips with Balance</p>
-                <h3>{tripsWithBalance}</h3>
-              </div>
-              <div className="payment-kpi-icon red-icon">
-                <FiAlertTriangle />
-              </div>
-            </div>
-          </div>
           <div className="payment-kpi-card green-card">
             <div className="payment-kpi-content">
               <div>
-                <p className="payment-kpi-label">Trips Settled</p>
-                <h3>{tripsSettled}</h3>
+                <p className="payment-kpi-label">Amount Collected</p>
+                <h3>₹{totalCollected.toLocaleString()}</h3>
               </div>
               <div className="payment-kpi-icon green-icon">
                 <FiDownload />
               </div>
             </div>
           </div>
+          <div className="payment-kpi-card red-card">
+            <div className="payment-kpi-content">
+              <div>
+                <p className="payment-kpi-label">Balance Remaining</p>
+                <h3>₹{totalBalance.toLocaleString()}</h3>
+              </div>
+              <div className="payment-kpi-icon red-icon">
+                <FiAlertTriangle />
+              </div>
+            </div>
+          </div>
           <div className="payment-kpi-card purple-card">
             <div className="payment-kpi-content">
               <div>
-                <p className="payment-kpi-label">Total Trips</p>
-                <h3>{trips.length}</h3>
+                <p className="payment-kpi-label">Items Settled</p>
+                <h3>{itemsSettled} / {allItems.length}</h3>
               </div>
               <div className="payment-kpi-icon purple-icon">
                 <FiDollarSign />
@@ -213,7 +296,9 @@ const Payments = () => {
             <div className="payment-kpi-content">
               <div>
                 <p className="payment-kpi-label">Total Profit</p>
-                <h3>₹{totalProfit.toLocaleString()}</h3>
+                <h3 style={{ color: totalProfit >= 0 ? "#7e22ce" : "#dc2626" }}>
+                  {totalProfit >= 0 ? "" : "-"}₹{Math.abs(totalProfit).toLocaleString()}
+                </h3>
               </div>
               <div className="payment-kpi-icon profit-icon">
                 <FiDollarSign />
@@ -226,7 +311,7 @@ const Payments = () => {
         <div style={{ display: "flex", gap: "15px", padding: "0 32px 20px" }}>
           <input
             className="t-input"
-            placeholder="Search by client name, phone, or trip ID..."
+            placeholder="Search by client name, phone, or reference..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ flex: 1 }}
@@ -238,9 +323,12 @@ const Payments = () => {
             style={{ width: "200px" }}
           >
             <option value="All Status">All Statuses</option>
+            <option value="Draft">Draft</option>
+            <option value="Sent">Sent</option>
             <option value="Pending">Pending</option>
             <option value="Partial">Partial</option>
             <option value="Paid">Paid</option>
+            <option value="Overdue">Overdue</option>
           </select>
         </div>
 
@@ -253,8 +341,10 @@ const Payments = () => {
             <thead>
               <tr style={{ background: "#f1f5f9", textAlign: "left", fontSize: "12px", color: "#475569", textTransform: "uppercase" }}>
                 <th style={{ padding: "14px 20px" }}>Client</th>
-                <th style={{ padding: "14px 20px" }}>Trips</th>
-                <th style={{ padding: "14px 20px" }}>Total Balance Due</th>
+                <th style={{ padding: "14px 20px" }}>Items</th>
+                <th style={{ padding: "14px 20px" }}>Total Value</th>
+                <th style={{ padding: "14px 20px" }}>Paid</th>
+                <th style={{ padding: "14px 20px" }}>Balance Due</th>
                 <th style={{ padding: "14px 20px" }}>Status</th>
                 <th style={{ padding: "14px 20px" }}>Action</th>
               </tr>
@@ -262,13 +352,13 @@ const Payments = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="5" style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>
-                    Loading trips...
+                  <td colSpan="7" style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>
+                    Loading ledger...
                   </td>
                 </tr>
               ) : Object.keys(clientGroups).length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>
+                  <td colSpan="7" style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>
                     No payment records found.
                   </td>
                 </tr>
@@ -294,7 +384,13 @@ const Payments = () => {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: "16px 20px" }}>{group.trips.length}</td>
+                        <td style={{ padding: "16px 20px" }}>{group.items.length}</td>
+                        <td style={{ padding: "16px 20px", fontWeight: "bold", color: "#0f172a" }}>
+                          ₹{group.total_value.toLocaleString()}
+                        </td>
+                        <td style={{ padding: "16px 20px", fontWeight: "bold", color: "#16a34a" }}>
+                          ₹{group.total_paid.toLocaleString()}
+                        </td>
                         <td style={{ padding: "16px 20px", fontWeight: "bold", color: group.total_balance > 0 ? "#ef4444" : "#10b981" }}>
                           ₹{group.total_balance.toLocaleString()}
                         </td>
@@ -306,42 +402,54 @@ const Payments = () => {
                         <td style={{ padding: "16px 20px" }}>—</td>
                       </tr>
 
-                      {/* Expanded: individual trip rows */}
+                      {/* Expanded: individual ledger items rows */}
                       {isExpanded &&
-                        group.trips.map((trip) => (
-                          <tr
-                            key={trip.id}
-                            style={{ background: "#fafafa", borderBottom: "1px solid #f1f5f9" }}
-                          >
-                            <td style={{ padding: "12px 20px 12px 54px" }}>
-                              <div style={{ fontWeight: "600", color: "#2563eb" }}>{trip.trip_id}</div>
-                              <div style={{ fontSize: "11px", color: "#64748b" }}>
-                                {trip.vehicle_number} · {new Date(trip.reporting_time).toLocaleDateString()}
-                              </div>
-                            </td>
-                            <td style={{ padding: "12px 20px", fontSize: "13px", color: "#475569" }}>
-                              {trip.pickup_location} → {trip.drop_location}
-                            </td>
-                            <td style={{ padding: "12px 20px", fontWeight: "600", color: (trip.balance_amount || 0) > 0 ? "#ef4444" : "#10b981" }}>
-                              ₹{(trip.balance_amount || 0).toLocaleString()}
-                            </td>
-                            <td style={{ padding: "12px 20px" }}>
-                              <span className={`status-badge ${trip.payment_status === "Paid" ? "active" : trip.payment_status === "Partial" ? "booked" : "maintenance"}`}>
-                                {trip.payment_status || "Pending"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 20px" }}>
-                              {(trip.balance_amount || 0) > 0 && (
-                                <button
-                                  className="btn-primary btn-sm"
-                                  onClick={(e) => openPayModal(e, trip)}
-                                >
-                                  <FiPlus style={{ marginRight: 4 }} /> Log Payment
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        group.items.map((item, idx) => {
+                          const itemBalance = item.balance;
+                          return (
+                            <tr
+                              key={`${item.type}-${item.id}-${idx}`}
+                              style={{ background: "#fafafa", borderBottom: "1px solid #f1f5f9" }}
+                            >
+                              <td style={{ padding: "12px 20px 12px 54px" }}>
+                                <div style={{ fontWeight: "600", color: "#2563eb" }}>{item.reference}</div>
+                                <div style={{ fontSize: "11px", color: "#64748b" }}>
+                                  {new Date(item.date).toLocaleDateString()}
+                                  <span style={{ marginLeft: 6, padding: "1px 4px", background: item.type === 'invoice' ? "#e0e7ff" : "#f1f5f9", borderRadius: 4, fontSize: "9px" }}>
+                                    {item.type.toUpperCase()}
+                                  </span>
+                                </div>
+                              </td>
+                              <td style={{ padding: "12px 20px", fontSize: "13px", color: "#475569" }}>
+                                {item.item_desc}
+                              </td>
+                              <td style={{ padding: "12px 20px", fontWeight: "600", color: "#0f172a" }}>
+                                ₹{item.total.toLocaleString()}
+                              </td>
+                              <td style={{ padding: "12px 20px", fontWeight: "600", color: "#16a34a" }}>
+                                ₹{item.paid.toLocaleString()}
+                              </td>
+                              <td style={{ padding: "12px 20px", fontWeight: "600", color: itemBalance > 0 ? "#ef4444" : "#10b981" }}>
+                                ₹{itemBalance.toLocaleString()}
+                              </td>
+                              <td style={{ padding: "12px 20px" }}>
+                                <span className={`status-badge ${item.status === "Paid" ? "active" : item.status === "Partial" ? "booked" : "maintenance"}`}>
+                                  {item.status || "Pending"}
+                                </span>
+                              </td>
+                              <td style={{ padding: "12px 20px" }}>
+                                {itemBalance > 0 && (
+                                  <button
+                                    className="btn-primary btn-sm"
+                                    onClick={(e) => openPayModal(e, item)}
+                                  >
+                                    <FiPlus style={{ marginRight: 4 }} /> Log Payment
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </React.Fragment>
                   );
                 })
@@ -351,77 +459,83 @@ const Payments = () => {
         </div>
 
         {/* ── Log Payment Modal ── */}
-        {showPayModal && payTrip && (
-          <div className="payment-modal-overlay">
-            <div className="payment-modal" style={{ maxWidth: "460px" }}>
-              <div className="payment-modal-top">
-                <h3>Log Payment</h3>
-                <button onClick={() => setShowPayModal(false)}>
-                  <FiX />
-                </button>
-              </div>
+        {showPayModal && payItem && (() => {
+          const currentBalance = payItem.balance;
+          const parsedAmount = parseFloat(amountReceived || 0);
+          const newBalance = Math.max(0, currentBalance - parsedAmount);
 
-              <div style={{ padding: "10px 0 20px", color: "#475569", fontSize: "14px" }}>
-                <strong>Trip:</strong> {payTrip.trip_id} — {payTrip.client_name}<br />
-                <strong>Current Balance:</strong>{" "}
-                <span style={{ color: "#ef4444", fontWeight: 700 }}>
-                  ₹{(payTrip.balance_amount || 0).toLocaleString()}
-                </span>
-              </div>
+          return (
+            <div className="payment-modal-overlay">
+              <div className="payment-modal" style={{ maxWidth: "460px" }}>
+                <div className="payment-modal-top">
+                  <h3>Log Payment ({payItem.type === "invoice" ? "Invoice" : "Trip"})</h3>
+                  <button onClick={() => setShowPayModal(false)}>
+                    <FiX />
+                  </button>
+                </div>
 
-              <form onSubmit={handleLogPayment} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <label className="trips-label">
-                  <span>Amount Received Now (₹) *</span>
-                  <input
-                    type="number"
-                    className="t-input"
-                    required
-                    min="1"
-                    max={payTrip.balance_amount || 999999}
-                    value={amountReceived}
-                    onChange={(e) => setAmountReceived(e.target.value)}
-                    placeholder={`Max: ₹${(payTrip.balance_amount || 0).toLocaleString()}`}
-                  />
-                </label>
+                <div style={{ padding: "10px 0 20px", color: "#475569", fontSize: "14px" }}>
+                  <strong>Reference:</strong> {payItem.reference}<br />
+                  <strong>Current Balance:</strong>{" "}
+                  <span style={{ color: "#ef4444", fontWeight: 700 }}>
+                    ₹{currentBalance.toLocaleString()}
+                  </span>
+                </div>
 
-                <label className="trips-label">
-                  <span>Payment Method</span>
-                  <select
-                    className="t-input"
-                    value={payMethod}
-                    onChange={(e) => setPayMethod(e.target.value)}
+                <form onSubmit={handleLogPayment} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  <label className="trips-label">
+                    <span>Amount Received Now (₹) *</span>
+                    <input
+                      type="number"
+                      className="t-input"
+                      required
+                      min="1"
+                      max={currentBalance || 999999}
+                      value={amountReceived}
+                      onChange={(e) => setAmountReceived(e.target.value)}
+                      placeholder={`Max: ₹${currentBalance.toLocaleString()}`}
+                    />
+                  </label>
+
+                  <label className="trips-label">
+                    <span>Payment Method</span>
+                    <select
+                      className="t-input"
+                      value={payMethod}
+                      onChange={(e) => setPayMethod(e.target.value)}
+                    >
+                      <option>Cash</option>
+                      <option>UPI</option>
+                      <option>Bank Transfer</option>
+                      <option>Cheque</option>
+                    </select>
+                  </label>
+
+                  {amountReceived && (
+                    <div style={{ padding: "12px 16px", background: "#f0fdf4", borderRadius: "8px", fontSize: "13px", color: "#166534" }}>
+                      New balance after payment:{" "}
+                      <strong>
+                        ₹{newBalance.toLocaleString()}
+                      </strong>
+                      {parsedAmount >= currentBalance && (
+                        <span style={{ marginLeft: 8, background: "#dcfce7", borderRadius: 4, padding: "2px 6px" }}>✓ Fully Settled</span>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="save-payment-btn"
+                    style={{ width: "100%" }}
+                    disabled={saving}
                   >
-                    <option>Cash</option>
-                    <option>UPI</option>
-                    <option>Bank Transfer</option>
-                    <option>Cheque</option>
-                  </select>
-                </label>
-
-                {amountReceived && (
-                  <div style={{ padding: "12px 16px", background: "#f0fdf4", borderRadius: "8px", fontSize: "13px", color: "#166534" }}>
-                    New balance after payment:{" "}
-                    <strong>
-                      ₹{Math.max(0, (payTrip.balance_amount || 0) - parseFloat(amountReceived || 0)).toLocaleString()}
-                    </strong>
-                    {parseFloat(amountReceived) >= (payTrip.balance_amount || 0) && (
-                      <span style={{ marginLeft: 8, background: "#dcfce7", borderRadius: 4, padding: "2px 6px" }}>✓ Fully Settled</span>
-                    )}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="save-payment-btn"
-                  style={{ width: "100%" }}
-                  disabled={saving}
-                >
-                  {saving ? "Saving..." : "Save Payment"}
-                </button>
-              </form>
+                    {saving ? "Saving..." : "Save Payment"}
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

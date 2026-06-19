@@ -1,12 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {FaClipboardList,FaTruckMoving,FaCheckCircle, FaRoute,} from "react-icons/fa";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { tripsAPI, vehiclesAPI, requireAuth } from "../../api";
+import { tripsAPI, vehiclesAPI, customersAPI, requireAuth, WS_BASE_URL } from "../../api";
 
 import "../../styles/Admin/AdminDashboard.css";
 import "../../styles/Admin/Trips.css";
+import "../../styles/Admin/TripDetails.css";
+
+// ── Fix Leaflet default marker icons ──────────────────
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl:       "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl:     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+const getDriverIcon = (driverName) => {
+  // Generate a consistent color based on driver name
+  const colors = ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#6366f1"];
+  let hash = 0;
+  for (let i = 0; i < (driverName || "").length; i++) {
+    hash = driverName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const color = colors[Math.abs(hash) % colors.length];
+
+  return L.divIcon({
+    className: "",
+    html: `<div class="live-pulse-wrapper">
+      <div class="live-pulse-ring" style="border-color: ${color}"></div>
+      <div class="live-pulse-dot" style="background-color: ${color}"></div>
+    </div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
 
 function Trips() {
   const navigate = useNavigate();
@@ -18,9 +50,17 @@ function Trips() {
 
   const [trips, setTrips] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  
+  // "__manual" is the sentinel value meaning "type manually"
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [manualClient, setManualClient] = useState(false);  // show manual inputs
+  
+  const [liveLocations, setLiveLocations] = useState({});
+  const wsRef = useRef(null);
 
   const [formData, setFormData] = useState({
     vehicle_id: "",
@@ -37,6 +77,41 @@ function Trips() {
     requireAuth();
     fetchTrips();
     fetchVehicles();
+    fetchCustomers();
+  }, []);
+
+  // Initialize live locations from initial fetch
+  useEffect(() => {
+    const locs = {};
+    trips.forEach(t => {
+      if (t.trip_status === "On Trip" && t.driver_lat && t.driver_lng) {
+        locs[t.id] = { lat: t.driver_lat, lng: t.driver_lng, ts: t.location_updated_at };
+      }
+    });
+    setLiveLocations(prev => ({ ...locs, ...prev }));
+  }, [trips]);
+
+  // Connect to global locations websocket
+  useEffect(() => {
+    const WS_URL = `${WS_BASE_URL}/all-locations/ws`;
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.trip_id) {
+          setLiveLocations((prev) => ({
+            ...prev,
+            [data.trip_id]: { lat: data.lat, lng: data.lng, ts: data.ts }
+          }));
+        }
+      } catch (err) {}
+    };
+
+    return () => {
+      ws.close();
+    };
   }, []);
 
   async function fetchTrips() {
@@ -57,6 +132,37 @@ function Trips() {
       setVehicles(data.filter((v) => v.status === "Active"));
     } catch (err) {
       console.error("Failed to load vehicles:", err);
+    }
+  }
+
+  async function fetchCustomers() {
+    try {
+      const data = await customersAPI.list();
+      setCustomers(data.filter((c) => c.is_active));
+    } catch (err) {
+      console.error("Failed to load customers:", err);
+    }
+  }
+
+  // When a customer is selected from the dropdown, auto-fill name + phone
+  function handleCustomerSelect(e) {
+    const val = e.target.value;
+    setSelectedCustomerId(val);
+    if (val === "__manual") {
+      // Show manual text inputs, clear any auto-filled values
+      setManualClient(true);
+      setFormData((prev) => ({ ...prev, client_name: "", client_phone: "" }));
+    } else if (val === "") {
+      setManualClient(false);
+      setFormData((prev) => ({ ...prev, client_name: "", client_phone: "" }));
+    } else {
+      const customer = customers.find((c) => c.id === val);
+      setManualClient(false);
+      setFormData((prev) => ({
+        ...prev,
+        client_name: customer?.name || "",
+        client_phone: customer?.phone || "",
+      }));
     }
   }
 
@@ -96,6 +202,8 @@ function Trips() {
         balance_amount: "",
         notes: "",
       });
+      setSelectedCustomerId("");
+      setManualClient(false);
       setShowForm(false);
       fetchVehicles();
       alert("Trip Created! Notifications sent to Driver & Client.");
@@ -211,6 +319,45 @@ function Trips() {
 
   </div>
 
+        {/* ── All Drivers Map ── */}
+        <div className="trips-map-panel" style={{ background: "white", padding: "20px", borderRadius: "12px", border: "1px solid #e2e8f0", marginBottom: "20px", boxShadow: "0 4px 6px rgba(0,0,0,0.02)" }}>
+          <div style={{ marginBottom: "16px" }}>
+            <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#1e293b", display: "flex", alignItems: "center", gap: "8px" }}>
+              🗺 Live Fleet Overview
+            </h2>
+            <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "14px" }}>
+              Real-time map showing all active drivers who are currently "On Trip".
+            </p>
+          </div>
+          
+          <div style={{ height: "400px", width: "100%", borderRadius: "10px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
+            <MapContainer
+              center={[20.5937, 78.9629]}
+              zoom={5}
+              style={{ height: "100%", width: "100%" }}
+            >
+              <TileLayer
+                attribution='&copy; OpenStreetMap'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {Object.entries(liveLocations).map(([tripId, loc]) => {
+                const trip = trips.find(t => t.id === tripId);
+                if (!trip) return null;
+                return (
+                  <Marker key={tripId} position={[loc.lat, loc.lng]} icon={getDriverIcon(trip.driver_name)}>
+                    <Popup>
+                      <strong>🔵 {trip.driver_name || "Unknown"}</strong><br />
+                      {trip.vehicle_number}<br />
+                      <small style={{ color: "#64748b" }}>{trip.pickup_location} ➔ {trip.drop_location}</small><br />
+                      <small style={{ color: "#94a3b8" }}>Last updated: {new Date(loc.ts).toLocaleTimeString()}</small>
+                    </Popup>
+                  </Marker>
+                );
+              })}
+            </MapContainer>
+          </div>
+        </div>
+
         {/* ── Create Trip Form ── */}
         {showForm && (
           <div className="trips-form-panel">
@@ -220,27 +367,77 @@ function Trips() {
             </p>
 
             <div className="trips-form-grid">
-              {/* Row 1 */}
-              <label className="trips-label">
-                <span>Client Name <span className="req">*</span></span>
-                <input
+              {/* Customer selector — auto-fills name & phone */}
+              <label className="trips-label" style={{ gridColumn: "1 / -1" }}>
+                <span>Customer <span className="req">*</span></span>
+                <select
+                  id="trip-customer-select"
                   className="t-input"
-                  name="client_name"
-                  value={formData.client_name}
-                  onChange={handleChange}
-                  placeholder="e.g. John Doe"
-                />
+                  value={selectedCustomerId}
+                  onChange={handleCustomerSelect}
+                  style={{ width: "100%" }}
+                >
+                  <option value="">-- Select a Customer --</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.phone ? ` · ${c.phone}` : ""}
+                    </option>
+                  ))}
+                  <option value="__manual">✏ Enter manually (one-off client)</option>
+                </select>
               </label>
-              <label className="trips-label">
-                <span>Client Phone <span className="req">*</span></span>
-                <input
-                  className="t-input"
-                  name="client_phone"
-                  value={formData.client_phone}
-                  onChange={handleChange}
-                  placeholder="e.g. +919876543210"
-                />
-              </label>
+
+              {/* Auto-filled read-only preview OR manual inputs */}
+              {selectedCustomerId && selectedCustomerId !== "__manual" && (
+                <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <label className="trips-label">
+                    <span>Client Name</span>
+                    <input
+                      className="t-input"
+                      value={formData.client_name}
+                      readOnly
+                      style={{ background: "#f8fafc", color: "#475569", cursor: "not-allowed" }}
+                    />
+                  </label>
+                  <label className="trips-label">
+                    <span>Client Phone</span>
+                    <input
+                      className="t-input"
+                      value={formData.client_phone || "—"}
+                      readOnly
+                      style={{ background: "#f8fafc", color: "#475569", cursor: "not-allowed" }}
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* Manual entry fallback */}
+              {manualClient && (
+                <>
+                  <label className="trips-label">
+                    <span>Client Name <span className="req">*</span></span>
+                    <input
+                      id="trip-client-name"
+                      className="t-input"
+                      name="client_name"
+                      value={formData.client_name}
+                      onChange={handleChange}
+                      placeholder="e.g. John Doe"
+                    />
+                  </label>
+                  <label className="trips-label">
+                    <span>Client Phone <span className="req">*</span></span>
+                    <input
+                      id="trip-client-phone"
+                      className="t-input"
+                      name="client_phone"
+                      value={formData.client_phone}
+                      onChange={handleChange}
+                      placeholder="e.g. +919876543210"
+                    />
+                  </label>
+                </>
+              )}
 
               {/* Row 2 */}
               <label className="trips-label">
@@ -274,11 +471,16 @@ function Trips() {
                   onChange={handleChange}
                 >
                   <option value="">Select Available Vehicle</option>
-                  {vehicles.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.number} ({v.type}) — Driver: {v.driver || "None"}
-                    </option>
-                  ))}
+                  {vehicles.map((v) => {
+                    const bt = v.bus_type ? ` - ${v.bus_type} ${v.bus_category}` : "";
+                    const tt = v.truck_category ? ` - ${v.truck_category} ${v.truck_size}` : "";
+                    const subtype = v.type === "Bus" ? `Bus${bt}` : v.type === "Truck" ? `Truck${tt}` : v.type;
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {v.number} ({subtype}) — Driver: {v.driver || "None"}
+                      </option>
+                    );
+                  })}
                 </select>
               </label>
               <label className="trips-label">
@@ -293,14 +495,14 @@ function Trips() {
               </label>
               {/* Row 4 — Balance Amount + Notes */}
               <label className="trips-label">
-                <span>Balance Amount (₹) <span className="req">*</span></span>
+                <span>Trip Cost / Selling Price (₹) <span className="req">*</span></span>
                 <input
                   className="t-input"
                   type="number"
                   name="balance_amount"
                   value={formData.balance_amount}
                   onChange={handleChange}
-                  placeholder="e.g. 5000"
+                  placeholder="e.g. 65000 (total agreed price)"
                   min="0"
                 />
               </label>
@@ -375,7 +577,14 @@ function Trips() {
                       <div className="trips-cell-secondary">{trip.client_phone}</div>
                     </td>
                     <td>
-                      <div className="trips-cell-primary">{trip.vehicle_number}</div>
+                      <div className="trips-cell-primary" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        {trip.vehicle_number}
+                        {["truck", "container", "flatbed", "refrigerated", "heavy-duty", "heavy", "lorry"].some(k => (trip.vehicle_type || "").toLowerCase().includes(k)) && (
+                          (trip.eway_bill && trip.gr_number) 
+                            ? <span title="Freight docs complete" style={{ fontSize: "14px" }}>✅</span> 
+                            : <span title="Missing freight docs" style={{ fontSize: "14px" }}>⚠️</span>
+                        )}
+                      </div>
                       <div className="trips-cell-secondary">{trip.driver_name}</div>
                     </td>
                     <td>

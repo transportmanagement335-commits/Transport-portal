@@ -65,4 +65,18 @@ async def create_indexes():
     await database.vehicles.create_index("owner_id")
     await database.vehicles.create_index("status")
 
+    # customers — index by owner_id for fast per-company lookups
+    await database.customers.create_index("owner_id")
+    await database.customers.create_index([("owner_id", 1), ("name", 1)])
+
+    # invoices — index by issuer_id (multi-tenancy), status, and due_date (overdue queries)
+    await database.invoices.create_index("issuer_id")
+    await database.invoices.create_index([("issuer_id", 1), ("status", 1)])
+    await database.invoices.create_index([("issuer_id", 1), ("due_date", 1)])
+    await database.invoices.create_index([("issuer_id", 1), ("recipient_id", 1)])
+
+    # counters — for atomic invoice number generation (unique per owner+year key)
+    # _id is automatically unique in MongoDB, no extra index needed
+
     print("[SUCCESS] Database indexes created")
+

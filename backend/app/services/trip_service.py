@@ -116,13 +116,9 @@ async def create_trip(
         "updated_at": now,
     }
 
-    # ── Auto-generate GR number + E-way bill for truck vehicles ──────────────
-    if _is_truck(vehicle_type):
-        doc["gr_number"] = f"GR-{now.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
-        doc["eway_bill"] = f"EWB-{int(now.timestamp())}"
-    else:
-        doc["gr_number"] = None
-        doc["eway_bill"] = None
+    # ── No auto-generation for E-way bill & GR number ──────────────
+    doc["gr_number"] = None
+    doc["eway_bill"] = None
 
     # ── Bus-specific permit fields (passed from request if provided) ──────────
     doc["permit_number"] = data.permit_number
@@ -249,6 +245,49 @@ async def delete_all_trips(owner_id: str, db: AsyncIOMotorDatabase) -> int:
 
     result = await db.trips.delete_many({"owner_id": owner_id})
     return result.deleted_count
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Freight Documentation
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def update_freight_docs(
+    trip_id: str,
+    eway_bill: Optional[str],
+    gr_number: Optional[str],
+    owner_id: str,
+    db: AsyncIOMotorDatabase,
+) -> Optional[dict]:
+    """Update and validate freight documentation for a trip."""
+    import re
+
+    try:
+        oid = ObjectId(trip_id)
+    except Exception:
+        return None
+
+    # Validate formats
+    if eway_bill:
+        if not re.match(r"^\d{12}$", eway_bill):
+            raise ValueError("E-way bill must be exactly 12 digits")
+            
+    if gr_number:
+        if not (3 <= len(gr_number) <= 50):
+            raise ValueError("GR number must be between 3 and 50 characters")
+
+    result = await db.trips.update_one(
+        {"_id": oid, "owner_id": owner_id},
+        {"$set": {
+            "eway_bill": eway_bill,
+            "gr_number": gr_number,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+    
+    if result.matched_count == 0:
+        return None
+        
+    doc = await db.trips.find_one({"_id": oid})
+    return _to_response(doc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

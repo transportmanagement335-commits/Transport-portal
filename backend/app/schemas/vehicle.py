@@ -27,6 +27,8 @@ class VehicleCreateRequest(BaseModel):
     body_type: Optional[str] = None
     truck_category: Optional[str] = None
     bus_type: Optional[str] = None
+    bus_category: Optional[str] = None
+    bus_layout: Optional[str] = None
     seating_capacity: Optional[str] = None
 
 
@@ -47,6 +49,8 @@ class VehicleUpdateRequest(BaseModel):
     body_type: Optional[str] = None
     truck_category: Optional[str] = None
     bus_type: Optional[str] = None
+    bus_category: Optional[str] = None
+    bus_layout: Optional[str] = None
     seating_capacity: Optional[str] = None
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -71,6 +75,8 @@ class VehicleResponse(BaseModel):
     body_type: Optional[str] = None
     truck_category: Optional[str] = None
     bus_type: Optional[str] = None
+    bus_category: Optional[str] = None
+    bus_layout: Optional[str] = None
     seating_capacity: Optional[str] = None
 
 

@@ -160,19 +160,51 @@ function AdminDashboard() {
 
               {/* VEHICLE TYPE VIEW */}
               <div className="dashboard-widget-panel">
-                <h2>Vehicle Type View</h2>
+                <h2>Live Fleet Overview</h2>
                 {loading ? (
                   <p className="no-data-msg">Loading distribution...</p>
                 ) : Object.keys(stats.type_distribution || {}).length === 0 ? (
                   <p className="no-data-msg">No vehicle types registered.</p>
                 ) : (
-                  <div className="type-distribution-list">
-                    {Object.entries(stats.type_distribution).map(([type, count]) => (
-                      <div className="type-item" key={type}>
-                        <span className="type-badge">{type || "Unknown"}</span>
-                        <span className="type-count">{count} {count === 1 ? 'vehicle' : 'vehicles'}</span>
-                      </div>
-                    ))}
+                  <div>
+                    {/* Stacked Bar */}
+                    <div style={{ display: 'flex', height: '24px', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
+                      {Object.entries(stats.type_distribution).map(([type, count]) => {
+                        const total = Object.values(stats.type_distribution).reduce((a, b) => a + b, 0);
+                        const bluePalette = ["#1e3a8a", "#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"];
+                        const amberPalette = ["#78350f", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d"];
+                        let hash = 0; for (let i = 0; i < type.length; i++) hash += type.charCodeAt(i);
+                        const color = type.startsWith("Bus") ? bluePalette[hash % bluePalette.length] : 
+                                      type.startsWith("Truck") ? amberPalette[hash % amberPalette.length] : "#64748b";
+                        return (
+                          <div 
+                            key={type} 
+                            style={{ 
+                              width: `${(count/total)*100}%`, 
+                              backgroundColor: color,
+                              borderRight: '1px solid #fff'
+                            }} 
+                            title={`${type}: ${count}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    {/* Legend */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                      {Object.entries(stats.type_distribution).map(([type, count]) => {
+                        const bluePalette = ["#1e3a8a", "#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"];
+                        const amberPalette = ["#78350f", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d"];
+                        let hash = 0; for (let i = 0; i < type.length; i++) hash += type.charCodeAt(i);
+                        const color = type.startsWith("Bus") ? bluePalette[hash % bluePalette.length] : 
+                                      type.startsWith("Truck") ? amberPalette[hash % amberPalette.length] : "#64748b";
+                        return (
+                          <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#334155' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: color }} />
+                            <span><strong>{type}</strong> ({count})</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

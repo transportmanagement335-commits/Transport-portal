@@ -121,6 +121,7 @@ async def create_driver(
         "owner_id": owner.id,           # Link driver to the creating owner
         "assigned_truck_id": None,      # No truck assigned yet
         "license_number": data.license_number,
+        "license_image_url": data.license_image_url,
         "license_expiry": data.license_expiry,
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),

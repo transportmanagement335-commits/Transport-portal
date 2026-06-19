@@ -149,6 +149,9 @@ function DriverDashboard() {
   const canvasRef = useRef(null);
   const [savingExpense, setSavingExpense] = useState(false);
 
+  // Docs Modal State
+  const [showDocsModal, setShowDocsModal] = useState(false);
+
   // Map state
   const [pickupPos, setPickupPos]       = useState(null);   // [lat, lng]
   const [dropPos, setDropPos]           = useState(null);   // [lat, lng]
@@ -379,6 +382,28 @@ function DriverDashboard() {
       if (receiptFile) {
         const uploadRes = await uploadAPI.uploadFile(receiptFile);
         receipt_url = uploadRes.url;
+        
+        // AI Receipt Verification
+        try {
+          const verifyRes = await expensesAPI.verifyReceipt({
+            amount: parseFloat(expenseForm.amount),
+            receipt_url
+          });
+          
+          if (verifyRes.extracted_amount !== null && !verifyRes.match) {
+            const proceed = window.confirm(
+              `Warning: The amount extracted by our AI from the receipt (₹${verifyRes.extracted_amount}) ` +
+              `does not match your entered amount (₹${expenseForm.amount}).\n\nDo you still want to proceed?`
+            );
+            if (!proceed) {
+              setSavingExpense(false);
+              return;
+            }
+          }
+        } catch (verifyErr) {
+          console.error("Receipt verification failed:", verifyErr);
+          // Proceed with expense creation even if verification fails
+        }
       }
 
       await expensesAPI.create({
@@ -583,6 +608,26 @@ function DriverDashboard() {
                     </>
                   )}
                 </div>
+
+                {/* Freight Docs Section (Trucks Only) */}
+                {["truck", "container", "flatbed", "refrigerated", "heavy-duty", "heavy", "lorry"].some(k => (trip?.vehicle_type || "").toLowerCase().includes(k)) && (
+                  <div className="drv-docs-section" style={{ marginTop: "16px", padding: "16px", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                    <h3 style={{ fontSize: "16px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>📄 Trip Documents</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+                      <div style={{ fontSize: "12px", color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>E-Way Bill</div>
+                      <div style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a", fontFamily: "monospace" }}>{trip.eway_bill || "NOT PROVIDED"}</div>
+                      
+                      <div style={{ fontSize: "12px", color: "#64748b", textTransform: "uppercase", fontWeight: 700, marginTop: "8px" }}>GR / LR Number</div>
+                      <div style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a", fontFamily: "monospace" }}>{trip.gr_number || "NOT PROVIDED"}</div>
+                    </div>
+                    <button 
+                      onClick={() => setShowDocsModal(true)}
+                      style={{ width: "100%", padding: "12px", background: "#334155", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}
+                    >
+                      👮 Show to Officer
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Right: Live Map */}
@@ -720,6 +765,49 @@ function DriverDashboard() {
           <div className="drv-loading">
             <div className="drv-map-spinner" />
             <p>Loading your dashboard…</p>
+          </div>
+        )}
+
+        {/* Docs Modal */}
+        {showDocsModal && (
+          <div className="modal-overlay" style={{ background: "rgba(0,0,0,0.9)", zIndex: 9999 }}>
+            <div className="modal-content" style={{ maxWidth: "100%", width: "100vw", height: "100vh", borderRadius: 0, padding: "24px", display: "flex", flexDirection: "column", justifyContent: "center", position: "relative" }}>
+              <button 
+                onClick={() => setShowDocsModal(false)}
+                style={{ position: "absolute", top: "24px", right: "24px", background: "none", border: "none", fontSize: "24px", cursor: "pointer", color: "#64748b" }}
+              >
+                ✕
+              </button>
+              
+              <div style={{ textAlign: "center", marginBottom: "32px" }}>
+                <div style={{ fontSize: "16px", color: "#64748b", fontWeight: 600, marginBottom: "8px" }}>Trip ID</div>
+                <div style={{ fontSize: "24px", fontWeight: 800 }}>{trip?.trip_id}</div>
+                <div style={{ fontSize: "16px", color: "#64748b", fontWeight: 600, marginTop: "16px", marginBottom: "8px" }}>Vehicle</div>
+                <div style={{ fontSize: "28px", fontWeight: 800, color: "#3b82f6" }}>{trip?.vehicle}</div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "24px", borderRadius: "16px", border: "2px solid #e2e8f0", marginBottom: "24px", textAlign: "center" }}>
+                <div style={{ fontSize: "18px", color: "#64748b", textTransform: "uppercase", fontWeight: 800, marginBottom: "12px", letterSpacing: "1px" }}>E-Way Bill</div>
+                <div style={{ fontSize: "36px", fontWeight: 900, color: "#0f172a", fontFamily: "monospace", wordBreak: "break-all" }}>
+                  {trip?.eway_bill || "N/A"}
+                </div>
+                {trip?.eway_bill && (
+                  <button 
+                    onClick={() => { navigator.clipboard.writeText(trip.eway_bill); alert("Copied!"); }}
+                    style={{ marginTop: "16px", padding: "8px 16px", background: "#e2e8f0", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", color: "#334155" }}
+                  >
+                    📋 Copy
+                  </button>
+                )}
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: "24px", borderRadius: "16px", border: "2px solid #e2e8f0", textAlign: "center" }}>
+                <div style={{ fontSize: "18px", color: "#64748b", textTransform: "uppercase", fontWeight: 800, marginBottom: "12px", letterSpacing: "1px" }}>GR / LR Number</div>
+                <div style={{ fontSize: "36px", fontWeight: 900, color: "#0f172a", fontFamily: "monospace", wordBreak: "break-all" }}>
+                  {trip?.gr_number || "N/A"}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

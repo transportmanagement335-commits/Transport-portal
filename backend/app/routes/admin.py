@@ -58,7 +58,8 @@ async def get_admin_stats(current_owner=Depends(require_owner)):
         type_distribution=stats["type_distribution"],
         document_expiry_alerts=stats["document_expiry_alerts"],
         payments=stats["payments"],
-        upcoming_duties=stats["upcoming_duties"]
+        upcoming_duties=stats["upcoming_duties"],
+        total_profit=stats["total_profit"]
     )
 
 

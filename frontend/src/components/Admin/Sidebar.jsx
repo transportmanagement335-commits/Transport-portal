@@ -10,6 +10,9 @@ import {
   FiCreditCard,
   FiSettings,
   FiLogOut,
+  FiDollarSign,
+  FiUserCheck,
+  FiClipboard,
 } from "react-icons/fi";
 
 import "../../styles/Admin/sidebar.css";
@@ -50,6 +53,21 @@ function Sidebar({ sidebarOpen }) {
       icon: <FiCreditCard />,
     },
     {
+      name: "Expenses",
+      path: "/expenses",
+      icon: <FiDollarSign />,
+    },
+    {
+      name: "Customers",
+      path: "/customers",
+      icon: <FiUserCheck />,
+    },
+    {
+      name: "Invoices",
+      path: "/invoices",
+      icon: <FiClipboard />,
+    },
+    {
       name: "Settings",
       path: "/settings",
       icon: <FiSettings />,
@@ -83,7 +101,11 @@ function Sidebar({ sidebarOpen }) {
             (item.path === "/trips" &&
               location.pathname === "/trip-details") ||
             (item.path === "/payments" &&
-              location.pathname === "/payment-details");
+              location.pathname === "/payment-details") ||
+            (item.path === "/customers" &&
+              location.pathname.startsWith("/customers")) ||
+            (item.path === "/invoices" &&
+              (location.pathname.startsWith("/invoices")));
 
           return (
             <li

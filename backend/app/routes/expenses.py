@@ -12,7 +12,15 @@ from app.database import get_database
 from app.models.expense import ExpenseInDB
 from app.models.user import UserRole
 from app.routes.auth import get_current_user, require_owner
-from app.schemas.expense import ExpenseCreateRequest, ExpenseResponse
+from app.schemas.expense import (
+    ExpenseCreateRequest, 
+    ExpenseResponse,
+    VerifyReceiptRequest,
+    VerifyReceiptResponse
+)
+from app.services.receipt_extractor import receipt_extractor
+import os
+import math
 
 router = APIRouter()
 
@@ -128,3 +136,43 @@ async def delete_expense(
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Expense not found")
     return None
+
+@router.post(
+    "/verify-receipt",
+    response_model=VerifyReceiptResponse,
+    summary="Verify receipt amount against user input",
+)
+async def verify_receipt(
+    data: VerifyReceiptRequest,
+    current_user=Depends(get_current_user),
+):
+    """
+    Takes an uploaded receipt URL and the user-entered amount.
+    Extracts the amount from the receipt using Qwen2.5-VL and checks if they match.
+    """
+    # The receipt_url is typically returned by the upload endpoint as "/uploads/filename"
+    # We need to map it to the local file path.
+    if not data.receipt_url.startswith("/uploads/"):
+        raise HTTPException(status_code=400, detail="Invalid receipt URL format")
+        
+    filename = data.receipt_url.replace("/uploads/", "")
+    file_path = os.path.join("uploads", filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Receipt file not found")
+        
+    try:
+        extracted_amount = await receipt_extractor.extract_amount(file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process receipt: {str(e)}")
+        
+    if extracted_amount is None:
+        return VerifyReceiptResponse(match=False, extracted_amount=None)
+        
+    # Check if they match within a reasonable tolerance (e.g., 0.01)
+    match = math.isclose(data.amount, extracted_amount, abs_tol=0.01)
+    
+    return VerifyReceiptResponse(
+        match=match,
+        extracted_amount=extracted_amount
+    )

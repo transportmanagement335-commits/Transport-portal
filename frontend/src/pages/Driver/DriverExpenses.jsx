@@ -15,11 +15,6 @@ function DriverExpenses() {
   const [tripExpenses, setTripExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    requireAuth();
-    fetchExpenses();
-  }, []);
-
   const fetchExpenses = async () => {
     try {
       setLoading(true);
@@ -48,6 +43,11 @@ function DriverExpenses() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    requireAuth();
+    fetchExpenses();
+  }, []);
 
   const totalTrips = tripExpenses.length;
 

@@ -1,16 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaUserCheck, FaUserClock, FaUserTie, FaUsers } from "react-icons/fa";
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { driversAPI, vehiclesAPI, requireAuth } from "../../api";
+import { driversAPI, vehiclesAPI, requireAuth, uploadAPI, SERVER_URL } from "../../api";
 
 import "../../styles/Admin/AdminDashboard.css";
 import "../../styles/Admin/Drivers.css";
 
 function Drivers() {
-  const navigate = useNavigate();
-
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
@@ -21,6 +17,7 @@ function Drivers() {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
@@ -29,16 +26,11 @@ function Drivers() {
     phone: "",
     password: "",
     license_number: "",
+    license_image_url: "",
     license_expiry: "",
   });
 
   // ── Load drivers and vehicles on mount ──────────────────────────────────────
-  useEffect(() => {
-    requireAuth();
-    fetchDrivers();
-    fetchVehicles();
-  }, []);
-
   async function fetchDrivers() {
     try {
       setLoading(true);
@@ -59,6 +51,12 @@ function Drivers() {
       console.error("Failed to load vehicles:", err);
     }
   }
+
+  useEffect(() => {
+    requireAuth();
+    fetchDrivers();
+    fetchVehicles();
+  }, []);
 
   // ── Add driver ─────────────────────────────────────────────────────────────
   async function addDriver() {
@@ -86,6 +84,7 @@ function Drivers() {
         phone: "",
         password: "",
         license_number: "",
+        license_image_url: "",
         license_expiry: "",
       });
       setShowForm(false);
@@ -98,6 +97,21 @@ function Drivers() {
 
   function handleChange(e) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  }
+
+  async function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const data = await uploadAPI.uploadFile(file);
+      setFormData((prev) => ({ ...prev, license_image_url: data.url }));
+    } catch (err) {
+      alert("Image upload failed: " + err.message);
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   // ── Filtering ───────────────────────────────────────────────────────────────
@@ -124,10 +138,6 @@ function Drivers() {
 
     return searchMatch && statusMatch && assignmentMatch;
   });
-
-  const activeCount = drivers.filter((d) => d.is_active).length;
-  const assignedCount = drivers.filter((d) => d.assigned_truck_id).length;
-  const unassignedCount = drivers.filter((d) => !d.assigned_truck_id).length;
 
   return (
     <div className="dashboard-layout">
@@ -230,6 +240,23 @@ function Drivers() {
                   onChange={handleChange}
                 />
               </label>
+
+              <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "600", color: "#64748b" }}>License Photo</span>
+                <input
+                  className="d-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                />
+                {uploadingImage && <span style={{ fontSize: "12px", color: "#3b82f6" }}>Uploading...</span>}
+                {formData.license_image_url && !uploadingImage && (
+                  <a href={`${SERVER_URL}${formData.license_image_url}`} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "#10b981", textDecoration: "underline" }}>
+                    View Uploaded Image
+                  </a>
+                )}
+              </label>
             </div>
             
             <p style={{ fontSize: "11px", color: "#64748b", marginTop: "12px" }}>
@@ -288,7 +315,21 @@ function Drivers() {
                     <td style={{ fontWeight: "600", color: "#071739" }}>{driver.name}</td>
                     <td>{driver.email}</td>
                     <td>{driver.phone}</td>
-                    <td>{driver.license_number}</td>
+                    <td>
+                      <div>
+                        {driver.license_number}
+                      </div>
+                      {driver.license_image_url && (
+                        <a 
+                          href={`${SERVER_URL}${driver.license_image_url}`} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          style={{ fontSize: "11px", color: "#3b82f6", textDecoration: "underline" }}
+                        >
+                          View Photo
+                        </a>
+                      )}
+                    </td>
                     <td>
                       {driver.license_expiry
                         ? new Date(driver.license_expiry).toLocaleDateString()

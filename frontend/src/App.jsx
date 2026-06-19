@@ -12,6 +12,12 @@ import VehicleDetails from "./pages/Admin/VehicleDetails";
 import Trips from "./pages/Admin/Trips";
 import TripDetails from "./pages/Admin/TripDetails";
 import Payments from "./pages/Admin/Payments";
+import Expenses from "./pages/Admin/Expenses";
+import Customers from "./pages/Admin/Customers";
+import CustomerDetails from "./pages/Admin/CustomerDetails";
+import Invoices from "./pages/Admin/Invoices";
+import CreateInvoice from "./pages/Admin/CreateInvoice";
+import InvoiceDetails from "./pages/Admin/InvoiceDetails";
 
 
 /* DRIVER PAGES */
@@ -84,6 +90,18 @@ function App() {
             path="/payments"
             element={<Payments />}
           />
+          <Route
+            path="/expenses"
+            element={<Expenses />}
+          />
+
+          {/* INVOICE & CUSTOMER ROUTES */}
+
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/customers/:id" element={<CustomerDetails />} />
+          <Route path="/invoices" element={<Invoices />} />
+          <Route path="/invoices/create" element={<CreateInvoice />} />
+          <Route path="/invoices/:id" element={<InvoiceDetails />} />
 
 
           {/* DRIVER ROUTES */}

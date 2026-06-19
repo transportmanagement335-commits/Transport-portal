@@ -22,6 +22,7 @@ from app.schemas.trip import (
     TripUpdateRequest,
     DutyLogEntryRequest,
     LocationUpdateRequest,
+    FreightDocsUpdateRequest,
 )
 from app.services import trip_service
 from app.services.websocket_manager import ws_manager
@@ -60,7 +61,7 @@ async def create_trip(
 ):
     """
     Creates a new trip.
-    - Auto-generates GR number + E-way bill for truck vehicles
+    - E-way bill and GR number default to null.
     - Triggers Twilio SMS to driver and client
     - Generates payment link
     - Schedules duty reminders
@@ -131,6 +132,37 @@ async def delete_all_trips(current_owner=Depends(require_owner)):
     db = get_database()
     deleted_count = await trip_service.delete_all_trips(current_owner.id, db)
     return {"message": f"Deleted {deleted_count} trips"}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Update Freight Docs
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.put(
+    "/{trip_id}/freight-docs",
+    response_model=TripResponse,
+    summary="Update freight documentation",
+)
+async def update_freight_docs(
+    trip_id: str,
+    data: FreightDocsUpdateRequest,
+    current_owner=Depends(require_owner),
+):
+    """Update E-way Bill and GR Number. Validates formats before saving."""
+    db = get_database()
+    try:
+        trip = await trip_service.update_freight_docs(
+            trip_id=trip_id,
+            eway_bill=data.eway_bill,
+            gr_number=data.gr_number,
+            owner_id=current_owner.id,
+            db=db
+        )
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+        return trip
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -222,3 +254,19 @@ async def location_websocket(trip_id: str, websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(trip_id, websocket)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WebSocket — global admin watches all active trips
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.websocket("/all-locations/ws")
+async def all_locations_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for admin to receive real-time driver locations for all trips.
+    """
+    await ws_manager.connect_global(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect_global(websocket)

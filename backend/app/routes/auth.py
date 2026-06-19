@@ -218,5 +218,6 @@ def _to_profile(user) -> UserProfileResponse:
         owner_id=user.owner_id,
         assigned_truck_id=user.assigned_truck_id,
         license_number=user.license_number,
+        license_image_url=user.license_image_url,
         license_expiry=user.license_expiry,
     )
