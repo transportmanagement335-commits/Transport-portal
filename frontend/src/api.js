@@ -92,6 +92,7 @@ async function apiFetch(path, opts = {}, retry = true) {
   const headers = {
     ...(opts.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    "ngrok-skip-browser-warning": "true",   // bypass ngrok interstitial page
     ...opts.headers,
   };
 

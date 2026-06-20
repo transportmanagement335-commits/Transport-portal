@@ -63,13 +63,18 @@ Backend API for managing transport fleets, drivers, and operations.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",      # Next.js dev
-        "http://localhost:5173",      # Vite/React dev
+        # ── Local development ──────────────────────────────────────────────
+        "http://localhost:3000",
+        "http://localhost:5173",
         "http://localhost:8080",
-        "http://127.0.0.1:3000",     # 127.0.0.1 variants (browsers vary)
+        "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:8080",
+        # ── Vercel production & preview deployments ────────────────────────
+        "https://transport-portal-psi.vercel.app",
+        "https://transport-portal.vercel.app",
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",   # covers ALL preview URLs
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
