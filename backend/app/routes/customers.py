@@ -136,7 +136,51 @@ async def update_customer(
         raise HTTPException(status_code=404, detail="Customer not found")
 
     doc = await db.customers.find_one({"_id": oid})
+
+    # ── Cascade updated fields to invoices & trips ────────────────────────────
+    # Invoices store a snapshot of customer info in `recipient_details`.
+    # Trips store client_name / client_phone directly on the document.
+    # We propagate any changed fields so the Payments page stays in sync.
+
+    customer_id_str = str(oid)
+
+    # Build the invoice recipient_details patch (only changed fields)
+    invoice_patch = {}
+    field_map = {
+        "name":    "recipient_details.name",
+        "phone":   "recipient_details.phone",
+        "email":   "recipient_details.email",
+        "address": "recipient_details.address",
+        "gst":     "recipient_details.gst",
+        "city":    "recipient_details.city",
+        "state":   "recipient_details.state",
+        "country": "recipient_details.country",
+    }
+    for customer_field, invoice_field in field_map.items():
+        if customer_field in updates:
+            invoice_patch[invoice_field] = updates[customer_field]
+
+    if invoice_patch:
+        await db.invoices.update_many(
+            {"recipient_id": customer_id_str, "owner_id": current_owner.id},
+            {"$set": invoice_patch},
+        )
+
+    # Cascade name and phone to trips (used in Payments + messaging)
+    trip_patch = {}
+    if "name"  in updates:
+        trip_patch["client_name"]  = updates["name"]
+    if "phone" in updates:
+        trip_patch["client_phone"] = updates["phone"]
+
+    if trip_patch:
+        await db.trips.update_many(
+            {"client_name": doc.get("name"), "owner_id": current_owner.id},
+            {"$set": trip_patch},
+        )
+
     return _to_response(doc)
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
