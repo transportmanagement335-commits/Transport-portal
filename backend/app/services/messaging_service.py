@@ -173,3 +173,15 @@ def send_driver_reminder(driver_phone: str, driver_name: str, trip: dict, hours_
     )
 
     return _send_whatsapp(driver_phone, body)
+
+
+def send_otp_message(phone: str, otp_code: str) -> bool:
+    """
+    Send an OTP via WhatsApp.
+    """
+    body = (
+        f"🔒 *Transport Portal Login*\n\n"
+        f"Your One-Time Password (OTP) is: *{otp_code}*\n\n"
+        f"This OTP is valid for 5 minutes. Do not share this code with anyone."
+    )
+    return _send_whatsapp(phone, body)

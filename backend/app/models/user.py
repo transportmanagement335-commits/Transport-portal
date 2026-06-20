@@ -41,6 +41,10 @@ class UserInDB(BaseModel):
     license_image_url: Optional[str] = None
     license_expiry: Optional[datetime] = None
 
+    # ── OTP fields ─────────────────────────────────────────────────────────────
+    otp_code: Optional[str] = None
+    otp_expires_at: Optional[datetime] = None
+
     model_config = {
         "populate_by_name": True,           # Allow both 'id' and '_id'
         "arbitrary_types_allowed": True,

@@ -6,7 +6,7 @@ import "leaflet/dist/leaflet.css";
 
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { tripsAPI, expensesAPI, vehiclesAPI, invoicesAPI, WS_BASE_URL, SERVER_URL, requireAuth } from "../../api";
+import { tripsAPI, expensesAPI, vehiclesAPI, invoicesAPI, notificationsAPI, WS_BASE_URL, SERVER_URL, requireAuth } from "../../api";
 import "../../styles/Admin/AdminDashboard.css";
 import "../../styles/Admin/Trips.css";
 import "../../styles/Admin/TripDetails.css";
@@ -144,6 +144,9 @@ function TripDetails() {
   const [freightSaving, setFreightSaving]     = useState(false);
   const [freightForm, setFreightForm]         = useState({ eway_bill: "", gr_number: "" });
   const [freightErrors, setFreightErrors]     = useState({});
+
+  // ── Resend Notifications ─────────────────────────────────────────────────
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (tripData) {
@@ -295,6 +298,41 @@ function TripDetails() {
       setError("Failed to save: " + err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ── Resend WhatsApp notifications ─────────────────────────────────────────
+  async function handleResendNotifications() {
+    if (!tripData) return;
+    setResending(true);
+    try {
+      const sends = [];
+      // Notify driver
+      if (tripData.driver_phone) {
+        sends.push(
+          notificationsAPI.sendWhatsAppMessage({
+            phone: tripData.driver_phone,
+            name: tripData.driver_name || "Driver",
+            messageType: "trip_assigned",
+          })
+        );
+      }
+      // Notify client
+      if (tripData.client_phone) {
+        sends.push(
+          notificationsAPI.sendWhatsAppMessage({
+            phone: tripData.client_phone,
+            name: tripData.client_name || "Client",
+            messageType: "booking_confirmed",
+          })
+        );
+      }
+      await Promise.all(sends);
+      alert("WhatsApp notifications resent to driver and client!");
+    } catch (err) {
+      alert("Failed to resend: " + err.message);
+    } finally {
+      setResending(false);
     }
   }
 
@@ -496,6 +534,28 @@ function TripDetails() {
             <p className="td-hint">
               * Duty reminders auto-schedule 2hr &amp; 1hr before reporting time.
             </p>
+            <button
+              onClick={handleResendNotifications}
+              disabled={resending}
+              style={{
+                marginTop: "12px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 16px",
+                background: resending ? "#94a3b8" : "#16a34a",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: 600,
+                fontSize: "13px",
+                cursor: resending ? "not-allowed" : "pointer",
+                transition: "background 0.2s",
+                width: "100%",
+              }}
+            >
+              {resending ? "Sending…" : "📲 Resend WhatsApp Notifications"}
+            </button>
           </div>
         </div>
 

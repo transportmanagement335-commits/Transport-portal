@@ -129,7 +129,50 @@ async def update_vehicle(
     await db.vehicles.update_one({"_id": oid}, {"$set": updates})
 
     new_driver_id = updates.get("driver_id", old_driver_id)
+    vehicle_number = updates.get("number", old_vehicle.get("number", "your vehicle"))
+
     if new_driver_id != old_driver_id:
+        # ── Revoke old driver ─────────────────────────────────────────────────
+        if old_driver_id:
+            try:
+                await db.users.update_one(
+                    {"_id": ObjectId(old_driver_id), "role": "driver"},
+                    {"$set": {"assigned_truck_id": None}}
+                )
+                # Notify revoked driver
+                old_driver = await db.users.find_one({"_id": ObjectId(old_driver_id)})
+                if old_driver and old_driver.get("phone"):
+                    from app.services.messaging_service import _send_whatsapp
+                    _send_whatsapp(
+                        old_driver["phone"],
+                        f"🔔 *Duty Update*\n"
+                        f"Hi {old_driver.get('name', 'Driver')}, you have been *unassigned* from vehicle *{vehicle_number}*.\n"
+                        f"Please contact your manager for further details."
+                    )
+            except Exception:
+                pass
+
+        # ── Assign new driver ─────────────────────────────────────────────────
+        if new_driver_id:
+            try:
+                await db.users.update_one(
+                    {"_id": ObjectId(new_driver_id), "role": "driver"},
+                    {"$set": {"assigned_truck_id": vehicle_id}}
+                )
+                # Notify new driver
+                new_driver = await db.users.find_one({"_id": ObjectId(new_driver_id)})
+                if new_driver and new_driver.get("phone"):
+                    from app.services.messaging_service import _send_whatsapp
+                    _send_whatsapp(
+                        new_driver["phone"],
+                        f"🚗 *Vehicle Assigned!*\n"
+                        f"Hi {new_driver.get('name', 'Driver')}, you have been *assigned* to vehicle *{vehicle_number}*.\n"
+                        f"Please log in to the Driver Portal for your upcoming trips and duties."
+                    )
+            except Exception:
+                pass
+    else:
+        # Driver unchanged — still sync assigned_truck_id in case it was cleared
         if old_driver_id:
             try:
                 await db.users.update_one(
@@ -152,6 +195,7 @@ async def update_vehicle(
         return None
     doc["_id"] = str(doc["_id"])
     return _to_response(doc)
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────

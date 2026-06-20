@@ -187,8 +187,111 @@ async def login_user(data: LoginRequest, db: AsyncIOMotorDatabase) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Token Refresh
+# OTP Login (Drivers only)
 # ──────────────────────────────────────────────────────────────────────────────
+
+import random
+from datetime import timedelta
+from app.services.messaging_service import send_otp_message
+
+async def request_driver_otp(phone: str, db: AsyncIOMotorDatabase) -> dict:
+    """
+    Find driver by phone, generate 6-digit OTP, save to DB, and send via WhatsApp.
+    """
+    user_doc = await db.users.find_one({"phone": phone, "role": UserRole.DRIVER})
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No driver found with this phone number.",
+        )
+    
+    user = UserInDB.from_mongo(user_doc)
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been deactivated. Contact your owner/admin.",
+        )
+
+    # Generate 6-digit OTP
+    otp_code = str(random.randint(100000, 999999))
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+
+    # Update DB
+    await db.users.update_one(
+        {"_id": ObjectId(user.id)},
+        {"$set": {"otp_code": otp_code, "otp_expires_at": expires_at}}
+    )
+
+    # Send OTP
+    send_otp_message(phone, otp_code)
+
+    return {"message": "OTP sent successfully"}
+
+async def verify_driver_otp(phone: str, otp_code: str, db: AsyncIOMotorDatabase) -> dict:
+    """
+    Verify OTP and issue tokens if successful.
+    """
+    user_doc = await db.users.find_one({"phone": phone, "role": UserRole.DRIVER})
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No driver found with this phone number.",
+        )
+    
+    user = UserInDB.from_mongo(user_doc)
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been deactivated. Contact your owner/admin.",
+        )
+
+    if not user.otp_code or user.otp_code != otp_code:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid OTP.",
+        )
+    
+    # Ensure otp_expires_at is timezone-aware
+    expires_at = user.otp_expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if not expires_at or expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="OTP has expired. Please request a new one.",
+        )
+
+    # Clear OTP
+    await db.users.update_one(
+        {"_id": ObjectId(user.id)},
+        {"$unset": {"otp_code": "", "otp_expires_at": ""}}
+    )
+
+    # Create tokens
+    access_token = create_access_token(
+        user_id=user.id,
+        role=user.role,
+        owner_id=user.owner_id if user.role == UserRole.DRIVER else None,
+    )
+    refresh_token = create_refresh_token(user_id=user.id)
+
+    # Persist refresh token in DB
+    await db.refresh_tokens.insert_one({
+        "user_id": user.id,
+        "token": refresh_token,
+        "expires_at": get_refresh_token_expiry(),
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "role": user.role,
+    }
+
+
 
 async def refresh_access_token(refresh_token: str, db: AsyncIOMotorDatabase) -> dict:
     """

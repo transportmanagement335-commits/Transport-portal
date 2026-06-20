@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { invoicesAPI, tripsAPI, paymentsAPI, adminAPI, requireAuth } from "../../api";
+import { invoicesAPI, tripsAPI, paymentsAPI, adminAPI, notificationsAPI, requireAuth } from "../../api";
 import "../../styles/Admin/Payments.css";
 
 import {
@@ -224,6 +224,31 @@ const Payments = () => {
     }
   };
 
+  // Send a payment reminder via WhatsApp
+  const [reminding, setReminding] = useState(null); // item id being reminded
+  async function sendReminder(e, group, item) {
+    e.stopPropagation();
+    const phone = group.client_phone;
+    const name = group.client_name;
+    if (!phone || phone === "N/A") {
+      alert("No phone number available for this client.");
+      return;
+    }
+    setReminding(item.id);
+    try {
+      await notificationsAPI.sendWhatsAppMessage({
+        phone,
+        name,
+        messageType: "invoice_reminder",
+      });
+      alert(`Payment reminder sent to ${name} (${phone}) via WhatsApp!`);
+    } catch (err) {
+      alert("Failed to send reminder: " + err.message);
+    } finally {
+      setReminding(null);
+    }
+  }
+
   return (
     <div className="dashboard-layout">
       <Sidebar sidebarOpen={sidebarOpen} />
@@ -437,15 +462,36 @@ const Payments = () => {
                                   {item.status || "Pending"}
                                 </span>
                               </td>
-                              <td style={{ padding: "12px 20px" }}>
-                                {itemBalance > 0 && (
-                                  <button
-                                    className="btn-primary btn-sm"
-                                    onClick={(e) => openPayModal(e, item)}
-                                  >
-                                    <FiPlus style={{ marginRight: 4 }} /> Log Payment
-                                  </button>
-                                )}
+                               <td style={{ padding: "12px 20px", display: "flex", gap: "8px", alignItems: "center" }}>
+                                 {itemBalance > 0 && (
+                                   <button
+                                     className="btn-primary btn-sm"
+                                     onClick={(e) => openPayModal(e, item)}
+                                   >
+                                     <FiPlus style={{ marginRight: 4 }} /> Log Payment
+                                   </button>
+                                 )}
+                                 {itemBalance > 0 && group.client_phone && group.client_phone !== "N/A" && (
+                                   <button
+                                     className="btn-sm"
+                                     onClick={(e) => sendReminder(e, group, item)}
+                                     disabled={reminding === item.id}
+                                     title="Send WhatsApp payment reminder"
+                                     style={{
+                                       background: reminding === item.id ? "#94a3b8" : "#16a34a",
+                                       color: "white",
+                                       border: "none",
+                                       borderRadius: "6px",
+                                       padding: "6px 10px",
+                                       cursor: reminding === item.id ? "not-allowed" : "pointer",
+                                       fontSize: "13px",
+                                       fontWeight: 600,
+                                       whiteSpace: "nowrap",
+                                     }}
+                                   >
+                                     {reminding === item.id ? "Sending…" : "📲 Remind"}
+                                   </button>
+                                 )}
                               </td>
                             </tr>
                           );

@@ -1,112 +1,73 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 import "../../styles/Driver/DriverLogin.css";
-import { BASE_URL } from "../../api";
+import { authAPI } from "../../api";
 
 function DriverLogin() {
-
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const [showPassword, setShowPassword] =
-    useState(false);
+  const [step, setStep] = useState(1); // 1: Phone, 2: OTP
+  const [phone, setPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-
+  const handleRequestOtp = async (e) => {
     e.preventDefault();
-
     setError("");
     setLoading(true);
 
     try {
+      await authAPI.requestOtp(phone);
+      setStep(2);
+    } catch (err) {
+      setError(err.message || "Failed to request OTP. Please check your phone number.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const response = await fetch(
-        `${BASE_URL}/auth/login`,
-        {
-          method: "POST",
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail || "Login failed"
-        );
-      }
-
+    try {
+      const data = await authAPI.verifyOtp(phone, otpCode);
+      
       if (data.role !== "driver") {
-        throw new Error(
-          "Unauthorized driver access"
-        );
+        throw new Error("Unauthorized driver access");
       }
 
-      localStorage.setItem(
-        "access_token",
-        data.access_token
-      );
-
-      localStorage.setItem(
-        "refresh_token",
-        data.refresh_token
-      );
-
-      localStorage.setItem(
-        "role",
-        data.role
-      );
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token);
+      localStorage.setItem("role", data.role);
 
       navigate("/driver-dashboard");
-
     } catch (err) {
-
-      setError(err.message);
-
+      setError(err.message || "Invalid OTP");
     } finally {
-
       setLoading(false);
-
     }
   };
 
   return (
     <div className="driver-container">
-
       <div className="driver-overlay">
-
         <div className="driver-left">
-
           <h1>Driver Portal</h1>
-
           <p>
             Access trip updates, vehicle details
             and transport assignments securely.
           </p>
-
         </div>
 
         <div className="driver-login-card">
-
           <h2>Driver Login</h2>
-
           <p className="sub-text">
-            Welcome back Driver
+            {step === 1 ? "Enter your registered phone number" : `Enter the 6-digit OTP sent to ${phone}`}
           </p>
 
           {error && (
@@ -115,84 +76,62 @@ function DriverLogin() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
-
-            <input
-              type="email"
-              placeholder="Enter Email Address"
-              required
-              value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
-              }
-            />
-
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-              }}
-            >
+          {step === 1 ? (
+            <form onSubmit={handleRequestOtp}>
               <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
-                placeholder="Enter Password"
+                type="tel"
+                placeholder="Enter Phone Number"
                 required
-                value={password}
-                onChange={(e) =>
-                  setPassword(e.target.value)
-                }
-                style={{
-                  width: "100%",
-                  paddingRight: "45px",
-                }}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
               />
+              <button type="submit" disabled={loading}>
+                {loading ? "Sending OTP..." : "Get OTP"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyOtp}>
+              <input
+                type="text"
+                placeholder="Enter 6-digit OTP"
+                required
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                style={{ letterSpacing: "4px", textAlign: "center", fontSize: "18px", fontWeight: "bold" }}
+              />
+              <button type="submit" disabled={loading}>
+                {loading ? "Verifying..." : "Login"}
+              </button>
+              
+              <div style={{ marginTop: "15px", textAlign: "center" }}>
+                <button 
+                  type="button" 
+                  onClick={handleRequestOtp} 
+                  disabled={loading}
+                  style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+                >
+                  Resend OTP
+                </button>
+                <span style={{ margin: "0 10px", color: "#d1d5db" }}>|</span>
+                <button 
+                  type="button" 
+                  onClick={() => setStep(1)} 
+                  style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", padding: 0 }}
+                >
+                  Change Number
+                </button>
+              </div>
+            </form>
+          )}
 
-              <span
-                onClick={() =>
-                  setShowPassword(!showPassword)
-                }
-                style={{
-                  position: "absolute",
-                  right: "15px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  cursor: "pointer",
-                  color: "#6b7280",
-                }}
-              >
-                {showPassword ? (
-                  <FaEyeSlash />
-                ) : (
-                  <FaEye />
-                )}
-              </span>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-            >
-              {loading
-                ? "Logging in..."
-                : "Login"}
-            </button>
-
-          </form>
-
-          <div className="register-link">
+          <div className="register-link" style={{ marginTop: "30px" }}>
             <p style={{ color: "#9ca3af", fontSize: "13px", textAlign: "center" }}>
               Don't have an account? Contact your vendor admin — driver accounts are created by your company.
             </p>
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 }

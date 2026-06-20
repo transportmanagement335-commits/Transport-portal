@@ -106,6 +106,35 @@ async def login(data: LoginRequest):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Driver OTP Login
+# ──────────────────────────────────────────────────────────────────────────────
+from app.schemas.auth import OTPRequestRequest, OTPVerifyRequest
+
+@router.post(
+    "/driver/request-otp",
+    summary="Request an OTP for Driver login",
+)
+async def request_driver_otp(data: OTPRequestRequest):
+    """
+    Finds driver by phone and sends an OTP via WhatsApp.
+    """
+    db = get_database()
+    return await auth_service.request_driver_otp(data.phone, db)
+
+@router.post(
+    "/driver/verify-otp",
+    response_model=TokenResponse,
+    summary="Verify OTP for Driver login",
+)
+async def verify_driver_otp(data: OTPVerifyRequest):
+    """
+    Verifies the OTP and returns tokens upon success.
+    """
+    db = get_database()
+    return await auth_service.verify_driver_otp(data.phone, data.otp_code, db)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Owner-authenticated routes
 # ──────────────────────────────────────────────────────────────────────────────
 

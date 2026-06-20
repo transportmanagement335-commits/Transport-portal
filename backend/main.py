@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
 
 from app.database import close_mongo_connection, connect_to_mongo
 from app.routes import auth, admin, vehicles, driver, trips, expenses, payments, upload, customers, invoices
@@ -114,3 +116,58 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "healthy"}
+
+
+class WhatsAppRequest(BaseModel):
+    phone: str
+    name: str
+    messageType: str
+
+
+@app.post("/api/send-whatsapp-message")
+def send_whatsapp_message(data: WhatsAppRequest):
+    from app.services.messaging_service import _send_whatsapp
+
+    message_templates = {
+        "trip_assigned": (
+            f"🚗 *Trip Assignment Alert*\n"
+            f"Hi {data.name}, you have a new trip assigned.\n"
+            f"Please log in to the Driver Portal for details."
+        ),
+        "booking_confirmed": (
+            f"✅ *Booking Confirmed!*\n"
+            f"Hi {data.name}, your booking has been confirmed.\n"
+            f"Please check your trip details."
+        ),
+        "payment_received": (
+            f"💳 *Payment Received*\n"
+            f"Hi {data.name}, we have received your payment. Thank you!"
+        ),
+        "invoice_reminder": (
+            f"📄 *Invoice Payment Reminder*\n"
+            f"Hi {data.name}, you have an outstanding invoice pending payment.\n"
+            f"Please clear it at your earliest convenience."
+        ),
+        "custom": (
+            f"📢 *Transport Portal*\n"
+            f"Hi {data.name}, you have a notification from your transport company."
+        ),
+        "driver_assigned": (
+            f"🚗 *Vehicle Assigned!*\n"
+            f"Hi {data.name}, you have been assigned to a vehicle.\n"
+            f"Please log in to the Driver Portal for your upcoming trips and duties."
+        ),
+        "driver_unassigned": (
+            f"🔔 *Duty Update*\n"
+            f"Hi {data.name}, you have been unassigned from your vehicle.\n"
+            f"Please contact your manager for further details."
+        ),
+    }
+
+    body = message_templates.get(data.messageType, message_templates["custom"])
+
+    success = _send_whatsapp(data.phone, body)
+    return {
+        "success": success,
+        "message": "WhatsApp message sent successfully" if success else "Failed to send WhatsApp message",
+    }

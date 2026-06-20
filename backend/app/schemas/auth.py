@@ -143,6 +143,26 @@ class AccessTokenResponse(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Driver OTP Login
+# ──────────────────────────────────────────────────────────────────────────────
+
+class OTPRequestRequest(BaseModel):
+    phone: str
+
+    @field_validator("phone")
+    @classmethod
+    def phone_format(cls, v: str) -> str:
+        digits = v.replace("+", "").replace("-", "").replace(" ", "")
+        if not digits.isdigit() or len(digits) < 10:
+            raise ValueError("Invalid phone number")
+        return v
+
+class OTPVerifyRequest(BaseModel):
+    phone: str
+    otp_code: str
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Public user profile (safe to send to client — no password_hash)
 # ──────────────────────────────────────────────────────────────────────────────
 
