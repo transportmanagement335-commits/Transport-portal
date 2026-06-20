@@ -7,14 +7,29 @@
  * - If refresh fails (refresh token expired/missing), redirects to login
  */
 
-export const API_HOST = import.meta.env.VITE_API_HOST || window.location.hostname;
-export const API_PORT = import.meta.env.VITE_API_PORT || "8000";
-export const API_PROTOCOL = window.location.protocol === "https:" ? "https:" : "http:";
-export const WS_PROTOCOL = window.location.protocol === "https:" ? "wss:" : "ws:";
+// ─── Backend URL ──────────────────────────────────────────────────────────────
+//
+//  Priority:
+//    1. VITE_SERVER_URL env var  →  set this in Vercel / .env.production
+//       e.g. https://subcortical-bradley-soniferous.ngrok-free.dev
+//
+//    2. Local fallback           →  http://localhost:8000
+//       (only used when running `npm run dev` on your own machine)
+//
+//  NEVER falls back to window.location.hostname so that Vercel deployments
+//  never accidentally call https://transport-portal-psi.vercel.app:8000.
+// ─────────────────────────────────────────────────────────────────────────────
 
-export const SERVER_URL = `${API_PROTOCOL}//${API_HOST}:${API_PORT}`;
-export const BASE_URL = `${SERVER_URL}/api`;
-export const WS_BASE_URL = `${WS_PROTOCOL}//${API_HOST}:${API_PORT}/api`;
+export const SERVER_URL = (import.meta.env.VITE_SERVER_URL || "http://localhost:8000").replace(/\/$/, "");
+export const BASE_URL    = `${SERVER_URL}/api`;
+export const WS_BASE_URL = SERVER_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/api";
+
+// Keep these exports so existing components that import them don't break.
+export const API_HOST     = new URL(SERVER_URL).hostname;
+export const API_PORT     = new URL(SERVER_URL).port || (SERVER_URL.startsWith("https") ? "443" : "80");
+export const API_PROTOCOL = new URL(SERVER_URL).protocol;
+export const WS_PROTOCOL  = SERVER_URL.startsWith("https") ? "wss:" : "ws:";
+
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
@@ -135,6 +150,8 @@ export function logout() {
 
 export const authAPI = {
   me: () => apiFetch("/auth/me"),
+  requestOtp: (phone) => apiFetch("/auth/driver/request-otp", { method: "POST", body: JSON.stringify({ phone }) }),
+  verifyOtp: (phone, otp_code) => apiFetch("/auth/driver/verify-otp", { method: "POST", body: JSON.stringify({ phone, otp_code }) }),
 };
 
 // ─── General File Upload ──────────────────────────────────────────────────────
@@ -241,4 +258,10 @@ export const invoicesAPI = {
   delete:          (id)           => apiFetch(`/invoices/${id}`, { method: "DELETE" }),
   fromTrip:        (tripId)       => apiFetch(`/invoices/from-trip/${tripId}`, { method: "POST" }),
   convertProforma: (id, body)     => apiFetch(`/invoices/convert-proforma/${id}`, { method: "POST", body: JSON.stringify(body) }),
+};
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export const notificationsAPI = {
+  sendWhatsAppMessage: (body) => apiFetch("/send-whatsapp-message", { method: "POST", body: JSON.stringify(body) }),
 };
