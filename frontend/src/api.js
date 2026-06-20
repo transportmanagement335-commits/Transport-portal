@@ -10,17 +10,24 @@
 // ─── Backend URL ──────────────────────────────────────────────────────────────
 //
 //  Priority:
-//    1. VITE_SERVER_URL env var  →  set this in Vercel / .env.production
-//       e.g. https://subcortical-bradley-soniferous.ngrok-free.dev
+//    1. VITE_SERVER_URL env var  (set in Vercel Dashboard to override this)
+//    2. Hardcoded ngrok tunnel   (current active tunnel for production)
+//    3. localhost:8000           (local dev fallback)
 //
-//    2. Local fallback           →  http://localhost:8000
-//       (only used when running `npm run dev` on your own machine)
-//
-//  NEVER falls back to window.location.hostname so that Vercel deployments
-//  never accidentally call https://transport-portal-psi.vercel.app:8000.
+//  To change the ngrok URL: update the NGROK_URL constant below.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const SERVER_URL = (import.meta.env.VITE_SERVER_URL || "http://localhost:8000").replace(/\/$/, "");
+const NGROK_URL = "https://subcortical-bradley-soniferous.ngrok-free.dev";
+
+// In development (local npm run dev), use localhost.
+// In production (Vercel build), use the ngrok URL — unless VITE_SERVER_URL overrides it.
+const isLocalDev = typeof window !== "undefined" && window.location.hostname === "localhost";
+
+export const SERVER_URL = (
+  import.meta.env.VITE_SERVER_URL ||
+  (isLocalDev ? "http://localhost:8000" : NGROK_URL)
+).replace(/\/$/, "");
+
 export const BASE_URL    = `${SERVER_URL}/api`;
 export const WS_BASE_URL = SERVER_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/api";
 
@@ -29,6 +36,7 @@ export const API_HOST     = new URL(SERVER_URL).hostname;
 export const API_PORT     = new URL(SERVER_URL).port || (SERVER_URL.startsWith("https") ? "443" : "80");
 export const API_PROTOCOL = new URL(SERVER_URL).protocol;
 export const WS_PROTOCOL  = SERVER_URL.startsWith("https") ? "wss:" : "ws:";
+
 
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
