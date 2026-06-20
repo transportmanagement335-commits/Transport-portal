@@ -127,6 +127,7 @@ class WhatsAppRequest(BaseModel):
     phone: str
     name: str
     messageType: str
+    amount: float = None
 
 
 @app.post("/api/send-whatsapp-message")
@@ -150,8 +151,9 @@ def send_whatsapp_message(data: WhatsAppRequest):
         ),
         "invoice_reminder": (
             f"📄 *Invoice Payment Reminder*\n"
-            f"Hi {data.name}, you have an outstanding invoice pending payment.\n"
-            f"Please clear it at your earliest convenience."
+            f"Hi {data.name}, you have an outstanding invoice pending payment"
+            + (f" of ₹{data.amount:,.2f}.\n" if data.amount is not None else ".\n")
+            + f"Please clear it at your earliest convenience."
         ),
         "custom": (
             f"📢 *Transport Portal*\n"

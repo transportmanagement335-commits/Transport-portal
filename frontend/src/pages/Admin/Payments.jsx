@@ -240,6 +240,7 @@ const Payments = () => {
         phone,
         name,
         messageType: "invoice_reminder",
+        amount: item.balance,
       });
       alert(`Payment reminder sent to ${name} (${phone}) via WhatsApp!`);
     } catch (err) {
