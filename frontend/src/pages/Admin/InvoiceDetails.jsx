@@ -190,7 +190,7 @@ function InvoiceDetails() {
             </button>
           )}
           {invoice.pdf_url && (
-            <button className="invd-btn secondary" onClick={() => window.open(`${SERVER_URL}${invoice.pdf_url}`, "_blank")}>
+            <button className="invd-btn secondary" onClick={() => window.open(`${SERVER_URL}${invoice.pdf_url}?t=${Date.now()}`, "_blank")}>
               <FiDownload /> Download PDF
             </button>
           )}
