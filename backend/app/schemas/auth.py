@@ -9,6 +9,16 @@ import re
 from pydantic import BaseModel, EmailStr, field_validator
 from email_validator import validate_email, EmailNotValidError
 
+def normalize_phone(v: str) -> str:
+    digits = v.replace("+", "").replace("-", "").replace(" ", "")
+    if not digits.isdigit() or len(digits) < 10:
+        raise ValueError("Invalid phone number")
+    if digits.startswith("91") and len(digits) == 12:
+        return "+" + digits
+    elif len(digits) == 10:
+        return "+91" + digits
+    return "+" + digits
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # OWNER Registration
@@ -50,10 +60,7 @@ class OwnerRegisterRequest(BaseModel):
     @field_validator("phone")
     @classmethod
     def phone_format(cls, v: str) -> str:
-        digits = v.replace("+", "").replace("-", "").replace(" ", "")
-        if not digits.isdigit() or len(digits) < 10:
-            raise ValueError("Invalid phone number")
-        return v
+        return normalize_phone(v)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -81,6 +88,11 @@ class DriverCreateRequest(BaseModel):
             return emailinfo.normalized
         except EmailNotValidError as e:
             raise ValueError(str(e))
+
+    @field_validator("phone")
+    @classmethod
+    def phone_format(cls, v: str) -> str:
+        return normalize_phone(v)
 
     @field_validator("password")
     @classmethod
@@ -152,14 +164,16 @@ class OTPRequestRequest(BaseModel):
     @field_validator("phone")
     @classmethod
     def phone_format(cls, v: str) -> str:
-        digits = v.replace("+", "").replace("-", "").replace(" ", "")
-        if not digits.isdigit() or len(digits) < 10:
-            raise ValueError("Invalid phone number")
-        return v
+        return normalize_phone(v)
 
 class OTPVerifyRequest(BaseModel):
     phone: str
     otp_code: str
+
+    @field_validator("phone")
+    @classmethod
+    def phone_format(cls, v: str) -> str:
+        return normalize_phone(v)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
