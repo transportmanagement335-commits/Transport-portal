@@ -131,11 +131,11 @@ function haversineDistance(pos1, pos2) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DriverDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
 
   const [stats, setStats]               = useState(null);
   const [trip, setTrip]                 = useState(null);
-  const [loading, setLoading]           = useState(true);
+  const [loading, setLoading]           = useState(window.innerWidth > 768);
   const [error, setError]               = useState("");
   const [statusUpdating, setStatusUpdating] = useState(false);
 
@@ -458,7 +458,7 @@ function DriverDashboard() {
         </div>
       </div> */}
 
-      <DriverSidebar isOpen={sidebarOpen} />
+      <DriverSidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
       
       <div
          className={`drv-main ${

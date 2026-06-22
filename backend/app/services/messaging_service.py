@@ -45,8 +45,12 @@ def _send_whatsapp(to_phone: str, body: str) -> bool:
         phone_number_id = getattr(settings, "WHATSAPP_PHONE_NUMBER_ID", None)
 
         if not token or not phone_number_id:
+            print("⚠️  WHATSAPP_API_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set. Message printed to terminal only.")
             logger.warning("WHATSAPP_API_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set. Message printed to terminal only.")
             return True
+
+        print(f"📡 Calling Meta API | Phone ID: {phone_number_id} | Token ends: ...{token[-10:]}")
+
 
         url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
         headers = {
@@ -64,13 +68,17 @@ def _send_whatsapp(to_phone: str, body: str) -> bool:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
 
         if response.status_code in (200, 201):
+            print(f"✅ WHATSAPP SENT → {wa_to} | Status: {response.status_code}")
             logger.info(f"WhatsApp sent to {wa_to} via Meta API | Status: {response.status_code}")
             return True
         else:
+            print(f"❌ WHATSAPP FAILED → {wa_to} | Status: {response.status_code}")
+            print(f"   Meta API Error: {response.text}")
             logger.error(f"Meta Graph API failed for {wa_to}: {response.status_code} - {response.text}")
             return False
 
     except Exception as e:
+        print(f"❌ WHATSAPP EXCEPTION → {to_phone}: {e}")
         logger.error(f"Failed to send WhatsApp to {to_phone}: {e}")
         return False
 

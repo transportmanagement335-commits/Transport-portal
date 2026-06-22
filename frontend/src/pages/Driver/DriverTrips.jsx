@@ -7,7 +7,7 @@ import DriverNavbar from "../../components/Driver/DriverNavbar";
 import "../../styles/Driver/DriverTrips.css";
 
 function DriverTrips() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [search, setSearch] = useState("");
 
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ function DriverTrips() {
 
   return (
     <div className="driver-layout">
-      <DriverSidebar isOpen={sidebarOpen} />
+      <DriverSidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
 
       <div
         className={`driver-content ${

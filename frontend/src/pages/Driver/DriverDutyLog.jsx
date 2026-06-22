@@ -6,7 +6,7 @@ import DriverNavbar from "../../components/Driver/DriverNavbar";
 import "../../styles/Driver/DriverDutyLog.css";
 
 function DriverDutyLog() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
 
   const [isOnDuty, setIsOnDuty] = useState(false);
 
@@ -16,7 +16,7 @@ function DriverDutyLog() {
   return (
     <div className="driver-layout">
 
-      <DriverSidebar isOpen={sidebarOpen} />
+      <DriverSidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
 
       <div
         className={`driver-content ${
