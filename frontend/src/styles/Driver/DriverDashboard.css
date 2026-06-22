@@ -402,3 +402,57 @@
 .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
 .btn-primary { background: #1d4ed8; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
 .btn-secondary { background: #f1f5f9; color: #475569; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+/* ─── MOBILE RESPONSIVE ───────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .drv-main.sidebar-open,
+  .drv-main.sidebar-closed {
+    margin-left: 0;
+  }
+  
+  .drv-topbar {
+    padding: 16px;
+    margin-bottom: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .drv-cards {
+    grid-template-columns: 1fr;
+    padding: 0 16px;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .drv-trip-grid {
+    grid-template-columns: 1fr;
+    padding: 0 16px;
+    gap: 16px;
+  }
+
+  .drv-action-row {
+    flex-direction: column;
+  }
+  
+  .drv-btn {
+    width: 100%;
+  }
+  
+  .drv-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .drv-map-wrap {
+    height: 300px;
+  }
+  
+  .drv-map-actions {
+    flex-direction: column;
+  }
+
+  .drv-no-trip {
+    margin: 16px;
+    padding: 32px 16px;
+  }
+}
