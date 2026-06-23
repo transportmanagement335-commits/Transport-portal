@@ -493,21 +493,21 @@ function DriverDashboard() {
 
         {/* ── Stat Cards ── */}
         <div className="drv-cards">
-          <div className="drv-card green">
+          <div className="drv-card greeen">
             <div className="drv-card-icon">📋</div>
             <div>
               <div className="drv-card-label">Active Trips</div>
               <div className="drv-card-value">{loading ? "—" : stats?.assigned_trips ?? 0}</div>
             </div>
           </div>
-          <div className="drv-card blue">
+          <div className="drv-card bluee">
             <div className="drv-card-icon">✅</div>
             <div>
               <div className="drv-card-label">Completed</div>
               <div className="drv-card-value">{loading ? "—" : stats?.completed_trips ?? 0}</div>
             </div>
           </div>
-          <div className="drv-card purple">
+          <div className="drv-card purplee">
             <div className="drv-card-icon">🚗</div>
             <div>
               <div className="drv-card-label">Vehicle Status</div>

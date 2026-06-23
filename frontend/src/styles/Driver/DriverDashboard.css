@@ -7,6 +7,7 @@
   display: flex;
   min-height: 100vh;
   background: #f1f5f9;
+  margin-top: 74px;
 }
 
 /* ─── Sidebar ─────────────────────────────────────────────────────────────── */
@@ -144,6 +145,7 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
   padding: 0 32px;
+  margin-top: 18px;
   margin-bottom: 28px;
 }
 
@@ -156,9 +158,9 @@
   color: white;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
-.drv-card.green  { background: linear-gradient(135deg, #10b981, #059669); }
-.drv-card.blue   { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-.drv-card.purple { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+.drv-card.greeen  { background: linear-gradient(135deg, #10b981, #059669); }
+.drv-card.bluee   { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.drv-card.purplee { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
 
 .drv-card-icon { font-size: 32px; }
 .drv-card-label { font-size: 12px; font-weight: 600; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }

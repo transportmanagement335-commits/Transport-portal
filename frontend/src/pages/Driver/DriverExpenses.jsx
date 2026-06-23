@@ -98,7 +98,7 @@ function DriverExpenses() {
 
           {/* KPI CARDS */}
 
-          <div className="expense-kpis">
+          {/* <div className="expense-kpis">
 
             <div className="expense-kpi blue">
               <h4>Total Trips</h4>
@@ -118,7 +118,7 @@ function DriverExpenses() {
               <span>{totalEntries}</span>
             </div>
 
-          </div>
+          </div> */}
 
           {/* HISTORY TABLE */}
 

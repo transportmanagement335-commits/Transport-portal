@@ -54,7 +54,7 @@ function DriverSidebar({ isOpen }) {
     <aside className={`driver-sidebar ${isOpen ? "open" : "closed"}`}>
 
       <div className="sidebar-logo">
-        <h2>TMS</h2>
+        {/* <h2>TMS </h2> */}
       </div>
 
       <ul>
@@ -84,3 +84,5 @@ function DriverSidebar({ isOpen }) {
 }
 
 export default DriverSidebar;
+
+

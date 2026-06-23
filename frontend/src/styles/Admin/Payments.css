@@ -37,57 +37,56 @@
 .payment-kpi-grid{
   display:grid;
   grid-template-columns:repeat(5,1fr);
-  gap:16px;
-  margin:0 32px 24px;
+  gap:18px;
+  padding:0 32px;
+  margin:24px 0;
 }
 
 .payment-kpi-card{
+  position:relative;
+
   background:#ffffff;
 
-  height:96px;
+  height:130px;
 
-  padding:16px 20px;
+  padding:22px;
 
-  border-radius:12px;
+  border-radius:14px;
 
   border:1px solid #e2e8f0;
   border-top:4px solid #081A44;
-
-  position:relative;
 
   display:flex;
   flex-direction:column;
   justify-content:center;
 
-  box-shadow:
-    0 2px 8px rgba(15,23,42,.04);
+  box-shadow:0 2px 8px rgba(15,23,42,.05);
 
-  transition:.25s ease;
+  transition:all .2s ease;
 }
 
 .payment-kpi-card:hover{
-  transform:translateY(-2px);
-
-  box-shadow:
-    0 10px 20px rgba(15,23,42,.08);
+   transform:translateY(-3px);
+  box-shadow:0 8px 20px rgba(15,23,42,.08);
 }
+
 
 /* =========================================================
    LABEL
 ========================================================= */
 
 .payment-kpi-label{
-  margin:0 0 8px;
+  margin:0 0 16px;
 
-  font-size:12px;
+  font-size:16px;
   font-weight:700;
 
   text-transform:uppercase;
-  letter-spacing:.8px;
+  letter-spacing:1px;
 
   color:#64748b;
 
-  line-height:1.2;
+  line-height:1.3;
 }
 
 /* =========================================================
@@ -95,14 +94,15 @@
 ========================================================= */
 
 .payment-kpi-card h3{
-  margin:0;
-
-  font-size:22px;
-
+  font-size:13px;
   font-weight:700;
-  line-height:1;
 
-  color:#081A44;
+  text-transform:uppercase;
+  letter-spacing:.8px;
+
+  color:#64748b;
+
+  margin:0 0 10px;
 }
 
 /* =========================================================
@@ -112,25 +112,23 @@
 .payment-kpi-icon{
   position:absolute;
 
-  right:20px;
-  top:22px;
-
-  width:48px;
-  height:48px;
-
-  border-radius:14px;
+  top:55px;
+  right:22px;
 
   display:flex;
   align-items:center;
   justify-content:center;
 
-  font-size:18px;
+  font-size:28px;
 
-  background:#eef4ff;
-  color:#081A44;
+  background:none;
+  border:none;
+
+  width:auto;
+  height:auto;
 }
 
-.orange-card{
+/* .orange-card{
   background:#ffedd5;
   border:1px solid #fed7aa;
   color:#ea580c;
@@ -152,13 +150,13 @@
   background:#dbeafe;
   border:1px solid #bfdbfe;
   color:#2563eb;
-}
+} 
 
 .profit-card{
   background:#f3e8ff;
   border:1px solid #e9d5ff;
   color:#7e22ce;
-}
+}*/
 
 /* ICON COLORS */
 

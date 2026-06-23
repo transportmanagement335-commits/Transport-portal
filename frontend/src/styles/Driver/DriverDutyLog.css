@@ -2,6 +2,7 @@
   min-height: 100vh;
   background: #f8fafc;
   transition: all 0.3s ease;
+  margin-top: 74px;
 }
 
 .sidebar-open {
@@ -108,17 +109,17 @@
 
 .blue {
   background: #eef6ff;
-  border-left: 5px solid #3b82f6;
+  border-left: 5px solid #081A44;
 }
 
 .green {
-  background: #f0fdf4;
-  border-left: 5px solid #22c55e;
+  background: #eef6ff;
+  border-left: 5px solid #081A44;
 }
 
 .orange {
-  background: #fff7ed;
-  border-left: 5px solid #f97316;
+  background: #eef6ff;
+  border-left: 5px solid #081A44;
 }
 
 /* TABLE CARD */
