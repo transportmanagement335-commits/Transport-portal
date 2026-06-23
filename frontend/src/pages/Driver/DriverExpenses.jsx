@@ -10,10 +10,10 @@ import "../../styles/Driver/DriverExpenses.css";
 function DriverExpenses() {
   const navigate = useNavigate();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
 
   const [tripExpenses, setTripExpenses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(window.innerWidth > 768);
 
   const fetchExpenses = async () => {
     try {
@@ -64,7 +64,7 @@ function DriverExpenses() {
   return (
     <div className="driver-layout">
 
-      <DriverSidebar isOpen={sidebarOpen} />
+      <DriverSidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
 
       <div
         className={`driver-content ${

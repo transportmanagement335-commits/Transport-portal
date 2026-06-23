@@ -219,7 +219,9 @@
 @media (max-width:768px){
 
   .driver-sidebar{
-    width:210px;
+    width:240px;
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
   }
 
   .sidebar-logo h2{
@@ -227,12 +229,13 @@
   }
 
   .driver-sidebar li{
-    height:38px;
-    font-size:13px;
+    height:42px;
+    font-size:14px;
   }
 
   .driver-sidebar.closed{
     transform:translateX(-100%);
+    box-shadow: none;
   }
 }
 

@@ -75,7 +75,7 @@ async def _post_whatsapp(payload: dict, token: str, phone_number_id: str) -> boo
 async def send_invoice_whatsapp(
     to_phone: str,
     invoice_number: str,
-    total_amount: float,
+    balance_amount: float,
     due_date: str,
     pdf_url: Optional[str],
     company_name: str,
@@ -87,7 +87,7 @@ async def send_invoice_whatsapp(
     Args:
         to_phone:       Customer's phone number (any format — will be normalised).
         invoice_number: e.g. "INV-2026-0001"
-        total_amount:   Total bill amount as float.
+        balance_amount: Balance amount due as float.
         due_date:       Human-readable date string, e.g. "15 Jul 2026".
         pdf_url:        Full public URL to the PDF, or None if not yet generated.
         company_name:   Issuing company name shown in the message.
@@ -113,13 +113,13 @@ async def send_invoice_whatsapp(
         return False
 
     symbol = "₹" if currency == "INR" else currency
-    total_str = f"{symbol}{total_amount:,.2f}"
+    balance_str = f"{symbol}{balance_amount:,.2f}"
 
     # ── Step 1: Text message ──────────────────────────────────────────────────
     text_body = (
         f"📋 *Invoice from {company_name}*\n\n"
         f"Invoice No: *{invoice_number}*\n"
-        f"Amount Due: *{total_str}*\n"
+        f"Balance Due: *{balance_str}*\n"
         f"Due Date:   *{due_date}*\n\n"
         f"Please find your invoice PDF attached. "
         f"For any queries, reply to this message."
@@ -143,7 +143,7 @@ async def send_invoice_whatsapp(
             "type": "document",
             "document": {
                 "link": pdf_url,
-                "caption": f"Invoice {invoice_number} — {total_str} due {due_date}",
+                "caption": f"Invoice {invoice_number} — {balance_str} due {due_date}",
                 "filename": f"{invoice_number}.pdf",
             },
         }

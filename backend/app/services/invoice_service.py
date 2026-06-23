@@ -132,10 +132,34 @@ async def create_invoice(
     # Calculate totals server-side
     totals = _calculate_totals(data.items, data.tax_rate, data.discount)
 
-    # Normalize due_date to naive UTC (strip tzinfo if the client sends timezone-aware ISO string)
+    # Normalize due_date to naive UTC
     due_date_naive = data.due_date.replace(tzinfo=None) if data.due_date.tzinfo else data.due_date
 
     invoice_number = await generate_invoice_number(owner_id, db)
+
+    # Carry over pre-paid amounts from trips
+    pre_paid_amount = 0.0
+    payment_records = []
+    if data.trip_ids:
+        trip_oids = []
+        for tid in data.trip_ids:
+            try:
+                trip_oids.append(ObjectId(tid))
+            except Exception:
+                pass
+        if trip_oids:
+            async for t in db.trips.find({"_id": {"$in": trip_oids}, "owner_id": owner_id}):
+                amt = float(t.get("amount_paid", 0.0))
+                if amt > 0:
+                    pre_paid_amount += amt
+
+    if pre_paid_amount > 0:
+        payment_records.append({
+            "amount": round(pre_paid_amount, 2),
+            "method": "carried over",
+            "notes": "Pre-paid amount carried over from linked trip(s)",
+            "recorded_at": now,
+        })
 
     doc = {
         "invoice_number": invoice_number,
@@ -153,11 +177,11 @@ async def create_invoice(
         "total_amount": totals["total_amount"],
         "currency": data.currency,
         "status": "draft",
-        "paid_amount": 0.0,
-        "payment_records": [],
+        "paid_amount": round(pre_paid_amount, 2),
+        "payment_records": payment_records,
         "issue_date": now,
         "due_date": due_date_naive,
-        "paid_date": None,
+        "paid_date": now if pre_paid_amount >= totals["total_amount"] and totals["total_amount"] > 0 else None,
         "trip_ids": data.trip_ids,
         "expense_ids": data.expense_ids,
         "notes": data.notes,
@@ -659,11 +683,11 @@ async def convert_proforma_to_final(
         "total_amount": totals["total_amount"],
         "currency": proforma.get("currency", "INR"),
         "status": "draft",
-        "paid_amount": 0.0,
-        "payment_records": [],
+        "paid_amount": proforma.get("paid_amount", 0.0),
+        "payment_records": proforma.get("payment_records", []),
         "issue_date": now,
         "due_date": due_date_naive,
-        "paid_date": None,
+        "paid_date": proforma.get("paid_date"),
         "trip_ids": proforma.get("trip_ids", []),
         "expense_ids": proforma.get("expense_ids", []),
         "notes": adjustments.get("notes") or proforma.get("notes"),

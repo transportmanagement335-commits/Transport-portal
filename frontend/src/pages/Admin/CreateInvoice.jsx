@@ -16,7 +16,7 @@ function CreateInvoice() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [customers, setCustomers]     = useState([]);
-  const [trips, setTrips]             = useState([]);
+  const [allTrips, setAllTrips]       = useState([]);
   const [loading, setLoading]         = useState(true);
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState("");
@@ -42,8 +42,7 @@ function CreateInvoice() {
           tripsAPI.list(),
         ]);
         setCustomers(custs.filter((c) => c.is_active));
-        // Only uninvoiced, completed trips
-        setTrips(tripsData.filter((t) => t.trip_status === "Completed" && !t.is_invoiced));
+        setAllTrips(tripsData);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -53,18 +52,42 @@ function CreateInvoice() {
     load();
   }, []);
 
+  const filteredTrips = useMemo(() => {
+    let filtered = allTrips;
+
+    // Filter by selected customer
+    if (customerId) {
+      const selectedCust = customers.find((c) => c.id === customerId);
+      if (selectedCust) {
+        filtered = filtered.filter((t) => t.client_name?.toLowerCase() === selectedCust.name?.toLowerCase());
+      }
+    }
+
+    // Filter by invoice stage
+    if (invoiceStage === "final") {
+      filtered = filtered.filter((t) => t.trip_status === "Completed" && !t.is_invoiced);
+    } else {
+      // For proforma/advance, show trips even if not completed
+      filtered = filtered.filter((t) => !t.is_invoiced);
+    }
+
+    return filtered;
+  }, [allTrips, customerId, invoiceStage, customers]);
+
   // Auto-fill from selected trip
   useEffect(() => {
     if (!tripId) return;
-    const trip = trips.find((t) => t.id === tripId);
+    const trip = allTrips.find((t) => t.id === tripId);
     if (!trip) return;
     const route = `${trip.pickup_location} → ${trip.drop_location}`;
     const cost  = trip.trip_cost || trip.balance_amount || 0;
     setItems([{ description: `Freight Charges: ${route}`, quantity: 1, unit: "trip", rate: cost }]);
-    // Try to match customer
-    const matchCust = customers.find((c) => c.name?.toLowerCase() === trip.client_name?.toLowerCase());
-    if (matchCust) setCustomerId(matchCust.id);
-  }, [tripId]);
+    // Try to match customer if not already selected
+    if (!customerId) {
+      const matchCust = customers.find((c) => c.name?.toLowerCase() === trip.client_name?.toLowerCase());
+      if (matchCust) setCustomerId(matchCust.id);
+    }
+  }, [tripId, allTrips, customers, customerId]);
 
   // Live totals calculation
   const { subtotal, taxAmount, total } = useMemo(() => {
@@ -191,19 +214,23 @@ function CreateInvoice() {
                   <div className="ci-card-header"><h3>② Auto-fill from Trip <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 400 }}>(optional)</span></h3></div>
                   <div className="ci-card-body">
                     <div className="ci-field">
-                      <label>Completed Uninvoiced Trip</label>
+                      <label>
+                        {invoiceStage === "final" ? "Completed Uninvoiced Trip" : "Uninvoiced Trip"}
+                      </label>
                       <select id="ci-trip" value={tripId} onChange={(e) => setTripId(e.target.value)}>
                         <option value="">-- None (manual entry) --</option>
-                        {trips.map((t) => (
+                        {filteredTrips.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.trip_id} · {t.client_name} · {t.pickup_location} → {t.drop_location} · ₹{(t.trip_cost || t.balance_amount || 0).toLocaleString()}
                           </option>
                         ))}
                       </select>
                     </div>
-                    {trips.length === 0 && (
+                    {filteredTrips.length === 0 && (
                       <p style={{ fontSize: 13, color: "#94a3b8", margin: "4px 0 0" }}>
-                        No completed uninvoiced trips found.
+                        {customerId 
+                          ? "No available trips found for this customer." 
+                          : "No available uninvoiced trips found."}
                       </p>
                     )}
                   </div>

@@ -10,9 +10,10 @@ import {
   LogOut
 } from "lucide-react";
 
+import { logout } from "../../api";
 import "../../styles/Driver/DriverSidebar.css";
 
-function DriverSidebar({ isOpen }) {
+function DriverSidebar({ isOpen, closeSidebar }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -50,11 +51,28 @@ function DriverSidebar({ isOpen }) {
     }
   ];
 
+  const handleNav = (path) => {
+    navigate(path);
+    if (closeSidebar && window.innerWidth <= 768) {
+      closeSidebar();
+    }
+  };
+
   return (
     <aside className={`driver-sidebar ${isOpen ? "open" : "closed"}`}>
 
       <div className="sidebar-logo">
         {/* <h2>TMS </h2> */}
+        {/* <h2>TMS</h2> */}
+        {/* Mobile close button */}
+        {isOpen && closeSidebar && window.innerWidth <= 768 && (
+          <button 
+            onClick={closeSidebar}
+            style={{ marginLeft: "auto", background: "none", border: "none", color: "#94a3b8", fontSize: "24px", cursor: "pointer" }}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <ul>
@@ -66,7 +84,7 @@ function DriverSidebar({ isOpen }) {
                 ? "active"
                 : ""
             }
-            onClick={() => navigate(item.path)}
+            onClick={() => handleNav(item.path)}
           >
             {item.icon}
             <span>{item.name}</span>
@@ -74,7 +92,7 @@ function DriverSidebar({ isOpen }) {
         ))}
       </ul>
 
-      <button className="logout-btn">
+      <button className="logout-btn" onClick={() => window.confirm("Log out?") && logout()}>
         <LogOut size={18} />
         <span>Logout</span>
       </button>

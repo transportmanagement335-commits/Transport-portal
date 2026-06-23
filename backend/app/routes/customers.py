@@ -127,13 +127,16 @@ async def update_customer(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    # Fetch old document FIRST so we can match old trip names
+    old_doc = await db.customers.find_one({"_id": oid, "owner_id": current_owner.id})
+    if not old_doc:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
     updates["updated_at"] = datetime.utcnow()
     result = await db.customers.update_one(
         {"_id": oid, "owner_id": current_owner.id},
         {"$set": updates},
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Customer not found")
 
     doc = await db.customers.find_one({"_id": oid})
 
@@ -161,8 +164,9 @@ async def update_customer(
             invoice_patch[invoice_field] = updates[customer_field]
 
     if invoice_patch:
+        # Note: Invoices use `issuer_id` for the owner/transport company
         await db.invoices.update_many(
-            {"recipient_id": customer_id_str, "owner_id": current_owner.id},
+            {"recipient_id": customer_id_str, "issuer_id": current_owner.id},
             {"$set": invoice_patch},
         )
 
@@ -174,8 +178,9 @@ async def update_customer(
         trip_patch["client_phone"] = updates["phone"]
 
     if trip_patch:
+        # Match using the OLD name so we catch trips before the rename!
         await db.trips.update_many(
-            {"client_name": doc.get("name"), "owner_id": current_owner.id},
+            {"client_name": old_doc.get("name"), "owner_id": current_owner.id},
             {"$set": trip_patch},
         )
 

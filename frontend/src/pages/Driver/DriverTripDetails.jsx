@@ -7,14 +7,14 @@ import DriverNavbar from "../../components/Driver/DriverNavbar";
 import "../../styles/Driver/DriverTripDetails.css";
 
 function DriverTripDetails() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
 
   const navigate = useNavigate();
   const { tripId } = useParams();
 
   return (
     <div className="driver-layout">
-      <DriverSidebar isOpen={sidebarOpen} />
+      <DriverSidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
 
       <div
         className={`driver-content ${

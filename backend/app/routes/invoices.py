@@ -166,7 +166,7 @@ async def send_invoice_via_whatsapp(
         wa_sent = await send_invoice_whatsapp(
             to_phone=to_phone,
             invoice_number=invoice.get("invoice_number", ""),
-            total_amount=invoice.get("total_amount", 0),
+            balance_amount=max(0.0, float(invoice.get("total_amount", 0.0)) - float(invoice.get("paid_amount", 0.0))),
             due_date=due_date_str,
             pdf_url=pdf_public_url,
             company_name=issuer_name,
