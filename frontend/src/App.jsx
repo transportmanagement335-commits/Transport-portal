@@ -18,7 +18,7 @@ import CustomerDetails from "./pages/Admin/CustomerDetails";
 import Invoices from "./pages/Admin/Invoices";
 import CreateInvoice from "./pages/Admin/CreateInvoice";
 import InvoiceDetails from "./pages/Admin/InvoiceDetails";
-
+import BusinessReport from "./pages/Admin/BusinessReport";
 
 /* DRIVER PAGES */
 
@@ -102,7 +102,9 @@ function App() {
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/create" element={<CreateInvoice />} />
           <Route path="/invoices/:id" element={<InvoiceDetails />} />
+          {/* business report   */}
 
+          <Route path="/business-report" element={<BusinessReport />} />
 
           {/* DRIVER ROUTES */}
 

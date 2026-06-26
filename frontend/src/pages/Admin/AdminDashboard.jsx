@@ -107,10 +107,7 @@ function AdminDashboard() {
     </div>
   </div>
 
-  <div className="card purple">
-    <h3>Total Profit</h3>
-    <p>{loading ? "—" : `₹${stats.total_profit?.toLocaleString() || 0}`}</p>
-  </div>
+
 
 </div>
 

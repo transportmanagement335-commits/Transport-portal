@@ -3,6 +3,7 @@ import { logout } from "../../api";
 
 import {
   FiHome,
+  FiTrendingUp,
   FiTruck,
   FiUsers,
   FiMap,
@@ -66,6 +67,11 @@ function Sidebar({ sidebarOpen }) {
       name: "Invoices",
       path: "/invoices",
       icon: <FiClipboard />,
+    },
+    {
+      name: "Business Report",
+      path: "/business-report",
+      icon: <FiTrendingUp />,
     },
     {
       name: "Settings",

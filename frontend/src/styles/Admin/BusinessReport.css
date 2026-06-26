@@ -1,0 +1,624 @@
+/* =========================================================
+   BusinessReport.css
+   Theme: Fleet Manager — mirrors AdminDashboard.css pattern
+
+========================================================= */
+ .dashboard-layout{
+  display:flex;
+  min-height:100vh;
+}
+
+.dashboard-content{
+  flex:1;
+  min-width:0;
+  background:#f5f7fb;
+}
+
+.dashboard-content.sidebar-open{
+  margin-left:210px;
+}
+
+.dashboard-content.sidebar-close{
+  margin-left:0;
+}
+
+.br-container{
+    width:100%;
+
+    padding:24px 32px;
+
+    background:#f5f7fb;
+
+    box-sizing:border-box;
+}
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.br-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding:  0;
+  margin-bottom: 20px;
+}
+
+.br-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.br-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #071739;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.br-title-icon {
+  color: #3b82f6;
+  font-size: 22px;
+}
+
+.br-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+
+.br-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.br-date-select {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #334155;
+}
+
+.br-date-select svg {
+  color: #3b82f6;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.br-date-select select {
+  border: none;
+  outline: none;
+  font-size: 12px;
+  color: #334155;
+  background: transparent;
+  cursor: pointer;
+}
+
+.br-download-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #081A44;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.br-download-btn:hover {
+  background: #0f2a6e;
+}
+
+/* =========================================================
+   ERROR / LOADING
+========================================================= */
+
+.br-error {
+  margin: 0 32px 16px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 12px;
+}
+
+.br-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 80px 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.br-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: br-spin 0.75s linear infinite;
+}
+
+@keyframes br-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================================================
+   KPI CARDS ROW  (matches dashboard .cards + .card pattern)
+========================================================= */
+
+.br-kpi-row {
+  display: grid;
+grid-template-columns:repeat(5,minmax(190px,1fr));  gap: 18px;
+  padding: 0 ;
+  margin-bottom: 22px;
+}
+
+.br-kpi-card {
+  position:relative;
+
+  background:#ffffff;
+
+  height:130px;
+
+  padding:22px;
+
+  border-radius:14px;
+
+  border:1px solid #e2e8f0;
+  border-top:4px solid #081A44;
+
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+
+  box-shadow:0 2px 8px rgba(15,23,42,.05);
+
+  transition:all .2s ease;
+}
+
+.br-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.09);
+}
+
+/* icon — top-right corner, like dashboard */
+.br-kpi-icon {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2563eb;
+  font-size: 15px;
+}
+
+.br-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: #64748b;
+  margin: 0;
+  padding-right: 44px; /* clear the icon */
+}
+
+.br-kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #081A44;
+  line-height: 1.1;
+  padding-right: 44px;
+}
+
+.br-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.br-trend.up {
+  color: #16a34a;
+}
+
+.br-trend.down {
+  color: #dc2626;
+}
+
+.br-trend svg {
+  font-size: 9px;
+}
+
+/* =========================================================
+   MID ROW — chart (wide) | AI insights (fixed right panel)
+========================================================= */
+
+.br-mid-row {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 20px;
+  padding: 0 ;
+  margin-bottom: 22px;
+  align-items: stretch;
+}
+
+/* =========================================================
+   SHARED WHITE CARD  (matches .dashboard-widget-panel)
+========================================================= */
+
+.br-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  transition: all 0.25s ease;
+}
+
+.br-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.br-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.br-card-header h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #071739;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.br-card-badge {
+  font-size: 11px;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-weight: 500;
+}
+
+.br-badge-ai {
+  font-size: 11px;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-weight: 600;
+}
+
+/* ── Chart card ── */
+.br-chart-card {
+  overflow: hidden;
+}
+
+.br-chart-empty {
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* ── AI Insights card ── */
+.br-insights-icon {
+  color: #3b82f6;
+  font-size: 15px;
+}
+
+.br-insights-empty {
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.br-insights-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.br-insight-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.55;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #fafcff;
+  border: 1px solid #edf2f7;
+}
+
+.br-insight-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+  background: #3b82f6;
+}
+
+.br-insight-item.type-success .br-insight-dot { background: #22c55e; }
+.br-insight-item.type-warning .br-insight-dot { background: #f59e0b; }
+.br-insight-item.type-danger  .br-insight-dot { background: #ef4444; }
+.br-insight-item.type-info    .br-insight-dot { background: #3b82f6; }
+
+.br-insight-text b,
+.br-insight-text strong {
+  color: #071739;
+  font-weight: 700;
+}
+
+/* =========================================================
+   BOTTOM — 3 equal-width table cards
+========================================================= */
+
+.br-tables-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 0 ;
+  margin-bottom: 32px;
+  align-items: flex-start;
+}
+
+/* .br-table-card inherits .br-card — just clip overflow */
+.br-table-card {
+  overflow: hidden;
+  /* remove the hover lift so tables feel stable */
+  transition: box-shadow 0.2s;
+}
+
+.br-table-card:hover {
+  transform: none;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+}
+
+.br-th-icon {
+  color: #3b82f6;
+  font-size: 13px;
+}
+
+.br-view-all {
+  font-size: 11px;
+  color: #2563eb;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+
+.br-view-all:hover {
+  opacity: 0.7;
+  text-decoration: underline;
+}
+
+.br-table-wrap {
+  overflow-x: auto;
+  /* remove the card's bottom padding gap */
+  margin: 0 -20px -20px;
+  padding: 0 0 0 0;
+}
+
+.br-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.br-table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 9px 14px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.br-table tbody tr {
+  border-bottom: 1px solid #edf2f7;
+  transition: background 0.15s;
+}
+
+.br-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.br-table tbody tr:hover {
+  background: #fafcff;
+}
+
+.br-table td {
+  padding: 10px 14px;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.br-td-name {
+  font-weight: 600;
+  color: #071739 !important;
+}
+
+/* total footer row */
+.br-tfoot td {
+  padding: 10px 14px;
+  font-weight: 700;
+  color: #071739;
+  border-top: 2px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 12px;
+}
+
+/* empty state row */
+.br-empty-row {
+  text-align: center !important;
+  color: #94a3b8;
+  padding: 28px 0 !important;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ── Growth badge ── */
+.br-growth {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.br-growth.up   { color: #16a34a; background: #f0fdf4; }
+.br-growth.down { color: #dc2626; background: #fef2f2; }
+
+/* ── Utilization bar ── */
+.br-util-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.br-util-bar {
+  flex: 1;
+  min-width: 44px;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.br-util-fill {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.br-util-wrap span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+}
+
+/* ── Driver rating ── */
+.br-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: #071739;
+  font-size: 12px;
+}
+
+.br-star {
+  color: #f59e0b;
+  font-size: 11px;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+/* 
+@media (max-width: 1400px) {
+  .br-kpi-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  .br-mid-row {
+    grid-template-columns: 1fr;
+  }
+
+  .br-tables-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+ @media (max-width: 900px) {
+  .br-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 0 16px;
+   } 
+
+  .br-mid-row,
+  .br-tables-row {
+    padding: 0 16px;
+  }
+
+  .br-header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .br-tables-row {
+    grid-template-columns: 1fr;
+  }
+} 
+
+@media (max-width: 600px) {
+  .br-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .br-kpi-value {
+    font-size: 18px;
+  }
+} */

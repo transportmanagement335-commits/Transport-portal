@@ -3,9 +3,9 @@ import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
 import { invoicesAPI, tripsAPI, paymentsAPI, adminAPI, notificationsAPI, requireAuth } from "../../api";
 import "../../styles/Admin/Payments.css";
-
+import { FaRupeeSign } from "react-icons/fa";
 import {
-  FiDollarSign,
+  FiCheckCircle,
   FiAlertTriangle,
   FiDownload,
   FiChevronDown,
@@ -281,7 +281,7 @@ const Payments = () => {
                 <h3>₹{totalLedgerValue.toLocaleString()}</h3>
               </div>
               <div className="payment-kpi-icon orange-icon">
-                <FiDollarSign />
+                <FaRupeeSign  />
               </div>
             </div>
           </div>
@@ -314,7 +314,7 @@ const Payments = () => {
                 <h3>{itemsSettled} / {allItems.length}</h3>
               </div>
               <div className="payment-kpi-icon purple-icon">
-                <FiDollarSign />
+                <FiCheckCircle  />
               </div>
             </div>
           </div>
@@ -327,7 +327,7 @@ const Payments = () => {
                 </h3>
               </div>
               <div className="payment-kpi-icon profit-icon">
-                <FiDollarSign />
+                <FaRupeeSign  />
               </div>
             </div>
           </div>

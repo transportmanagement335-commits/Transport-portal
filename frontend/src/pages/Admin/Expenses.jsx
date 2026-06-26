@@ -3,9 +3,8 @@ import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
 import { expensesAPI, tripsAPI, uploadAPI, SERVER_URL, requireAuth } from "../../api";
 import "../../styles/Admin/Expenses.css";
-
+import { FaRupeeSign } from "react-icons/fa";
 import {
-  FiDollarSign,
   FiTrash2,
   FiSearch,
   FiChevronDown,
@@ -289,7 +288,7 @@ const Expenses = () => {
                 <h3>₹{totalExpenses.toLocaleString()}</h3>
               </div>
               <div className="expense-kpi-icon red-icon">
-                <FiDollarSign />
+                <FaRupeeSign />
               </div>
             </div>
           </div>
