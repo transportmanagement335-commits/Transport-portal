@@ -18,6 +18,7 @@ function AdminRegister() {
     phone: "",
     company_name: "",
     gst_number: "",
+    service_type: "Tankers",
     password: "",
   });
 
@@ -229,6 +230,23 @@ function AdminRegister() {
                 value={formData.gst_number}
                 onChange={handleChange}
               />
+
+            </div>
+
+            <div className="input-group">
+
+              <label>Type of Service</label>
+
+              <select
+                name="service_type"
+                value={formData.service_type}
+                onChange={handleChange}
+                required
+              >
+                <option value="Tankers">Tankers</option>
+                <option value="Busses">Busses</option>
+                <option value="Trucks">Trucks</option>
+              </select>
 
             </div>
 

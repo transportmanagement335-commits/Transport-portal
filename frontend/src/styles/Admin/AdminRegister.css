@@ -106,7 +106,8 @@
   color:#374151;
 }
 
-.input-group input{
+.input-group input,
+.input-group select {
   width:100%;
   padding:14px;
   border:1px solid #d1d5db;
@@ -116,7 +117,8 @@
   transition:0.3s;
 }
 
-.input-group input:focus{
+.input-group input:focus,
+.input-group select:focus {
   border-color:#2563eb;
 }
 

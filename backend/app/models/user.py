@@ -33,6 +33,7 @@ class UserInDB(BaseModel):
     # ── Owner-only fields ──────────────────────────────────────────────────────
     company_name: Optional[str] = None      # Required for owners
     gst_number: Optional[str] = None        # Optional GST/tax number
+    service_type: Optional[str] = None      # Service type (e.g., Tankers, Busses, Trucks)
 
     # ── Driver-only fields ─────────────────────────────────────────────────────
     owner_id: Optional[str] = None          # ObjectId of the owning owner (required for drivers)

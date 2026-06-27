@@ -32,6 +32,7 @@ class OwnerRegisterRequest(BaseModel):
     password: str
     company_name: str
     gst_number: Optional[str] = None
+    service_type: str
 
     @field_validator("email")
     @classmethod
@@ -193,6 +194,7 @@ class UserProfileResponse(BaseModel):
     # Owner fields
     company_name: Optional[str] = None
     gst_number: Optional[str] = None
+    service_type: Optional[str] = None
 
     # Driver fields
     owner_id: Optional[str] = None

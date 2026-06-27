@@ -57,6 +57,7 @@ async def register_owner(data: OwnerRegisterRequest, db: AsyncIOMotorDatabase) -
         "is_active": True,
         "company_name": data.company_name,
         "gst_number": data.gst_number,
+        "service_type": data.service_type,
         # Driver-only fields — not set for owners
         "owner_id": None,
         "assigned_truck_id": None,
