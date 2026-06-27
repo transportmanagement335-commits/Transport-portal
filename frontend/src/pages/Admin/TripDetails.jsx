@@ -721,6 +721,9 @@ function TripDetails() {
                       {exp.receipt_url && <a href={`${SERVER_URL}${exp.receipt_url}`} target="_blank" rel="noreferrer" style={{ marginLeft: 8, color: "#3b82f6", textDecoration: "none" }}>🧾 View Receipt</a>}
                       {exp.location_lat && <a href={`https://maps.google.com/?q=${exp.location_lat},${exp.location_lng}`} target="_blank" rel="noreferrer" style={{ marginLeft: 8, color: "#10b981", textDecoration: "none" }}>📍 Geotagged</a>}
                     </div>
+                    {exp.audio_note_url && (
+                      <audio src={`${SERVER_URL}${exp.audio_note_url}`} controls style={{ height: "30px", width: "200px", marginTop: "8px" }} />
+                    )}
                   </div>
                   <div style={{ fontWeight: 600, color: "#ef4444" }}>₹{exp.amount.toLocaleString()}</div>
                 </div>

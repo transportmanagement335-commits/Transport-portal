@@ -146,6 +146,10 @@ function DriverExpenseDetails() {
                       </th>
 
                       <th>
+                        Notes & Audio
+                      </th>
+
+                      <th>
                         Receipt
                       </th>
                     </tr>
@@ -187,6 +191,13 @@ function DriverExpenseDetails() {
                               {
                                 expense.date
                               }
+                            </td>
+
+                            <td>
+                              {expense.notes && <p style={{margin: 0, fontSize: "13px"}}>{expense.notes}</p>}
+                              {expense.audio_note_url && (
+                                <audio src={`http://localhost:8000${expense.audio_note_url}`} controls style={{ height: "30px", width: "120px", marginTop: "4px" }} />
+                              )}
                             </td>
 
                             <td>

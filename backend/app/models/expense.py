@@ -22,6 +22,7 @@ class ExpenseInDB(BaseModel):
     amount: float
     date: datetime = Field(default_factory=datetime.utcnow)
     notes: Optional[str] = None
+    audio_note_url: Optional[str] = None
     recorded_by: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

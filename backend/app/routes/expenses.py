@@ -72,6 +72,7 @@ async def create_expense(
         "amount": data.amount,
         "date": expense_date,
         "notes": data.notes or "",
+        "audio_note_url": data.audio_note_url,
         "receipt_url": data.receipt_url,
         "location_lat": data.location_lat,
         "location_lng": data.location_lng,

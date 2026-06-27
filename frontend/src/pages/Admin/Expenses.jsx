@@ -390,7 +390,12 @@ const Expenses = () => {
                             <td style={{ padding: "12px 20px", fontWeight: "bold", color: "#ef4444" }}>
                               ₹{expense.amount.toLocaleString()}
                             </td>
-                            <td style={{ padding: "12px 20px", color: "#64748b" }}>{expense.notes || "—"}</td>
+                            <td style={{ padding: "12px 20px", color: "#64748b" }}>
+                              {expense.notes || "—"}
+                              {expense.audio_note_url && (
+                                <audio src={SERVER_URL + expense.audio_note_url} controls style={{ height: "30px", width: "150px", display: "block", marginTop: "4px" }} />
+                              )}
+                            </td>
                             <td style={{ padding: "12px 20px" }}>{expense.recorded_by}</td>
                             <td style={{ padding: "12px 20px" }}>
                               {expense.receipt_url ? (

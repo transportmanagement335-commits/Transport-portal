@@ -148,6 +148,11 @@ function DriverDashboard() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [savingExpense, setSavingExpense] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
 
   // Docs Modal State
   const [showDocsModal, setShowDocsModal] = useState(false);
@@ -372,6 +377,38 @@ function DriverDashboard() {
   }, [driverPos, dropPos, trip?.status, tripTotalDistance, statusUpdating]);
 
   // ── Expenses ─────────────────────────────────────────────────────────────
+  const handleToggleRecord = async () => {
+    if (isRecording) {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          setAudioBlob(blob);
+          setAudioUrl(URL.createObjectURL(blob));
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        alert("Microphone access denied or error occurred: " + err.message);
+      }
+    }
+  };
+
   async function handleAddExpense(e) {
     e.preventDefault();
     if (!trip?.id || !expenseForm.amount) return;
@@ -406,12 +443,20 @@ function DriverDashboard() {
         }
       }
 
+      let audio_note_url = null;
+      if (audioBlob) {
+        const audioFile = new File([audioBlob], 'audio_note.webm', { type: 'audio/webm' });
+        const audioUploadRes = await uploadAPI.uploadFile(audioFile);
+        audio_note_url = audioUploadRes.url;
+      }
+
       await expensesAPI.create({
         vehicle_id: trip.vehicle_id || "", 
         trip_id: trip.id,
         category: expenseForm.category,
         amount: parseFloat(expenseForm.amount),
         notes: expenseForm.notes,
+        audio_note_url,
         receipt_url,
         location_lat: driverPos ? driverPos[0] : null,
         location_lng: driverPos ? driverPos[1] : null,
@@ -419,6 +464,8 @@ function DriverDashboard() {
       setShowExpenseModal(false);
       setExpenseForm({ category: "Fuel", amount: "", notes: "" });
       setReceiptFile(null);
+      setAudioBlob(null);
+      setAudioUrl(null);
       alert("Expense logged successfully!");
     } catch (err) {
       alert("Failed to log expense: " + err.message);
@@ -847,12 +894,43 @@ function DriverDashboard() {
                 </div>
                 <div className="form-group">
                   <label>Notes (Optional)</label>
-                  <input 
-                    type="text" 
-                    value={expenseForm.notes} 
-                    onChange={e => setExpenseForm({...expenseForm, notes: e.target.value})} 
-                    placeholder="e.g. Filled 20L diesel at BPCL"
-                  />
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <input 
+                      type="text" 
+                      value={expenseForm.notes} 
+                      onChange={e => setExpenseForm({...expenseForm, notes: e.target.value})} 
+                      placeholder="e.g. Filled 20L diesel at BPCL"
+                      style={{ flex: 1 }}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleToggleRecord}
+                      className="btn-secondary"
+                      style={{ 
+                        padding: "10px 15px", 
+                        backgroundColor: isRecording ? "#fee2e2" : "#f1f5f9",
+                        color: isRecording ? "#ef4444" : "#475569",
+                        borderColor: isRecording ? "#ef4444" : "#cbd5e1",
+                        whiteSpace: "nowrap"
+                      }}
+                      title="Record Voice Note"
+                    >
+                      {isRecording ? "🔴 Stop Recording" : "🎤 Record"}
+                    </button>
+                  </div>
+                  {audioUrl && (
+                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: "10px" }}>
+                      <audio src={audioUrl} controls style={{ height: "36px", flex: 1 }} />
+                      <button 
+                        type="button" 
+                        onClick={() => { setAudioUrl(null); setAudioBlob(null); }}
+                        style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: "50%", width: "24px", height: "24px", cursor: "pointer", fontSize: "12px" }}
+                        title="Delete Audio"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Receipt Photo</label>

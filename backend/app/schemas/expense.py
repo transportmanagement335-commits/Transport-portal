@@ -9,6 +9,7 @@ class ExpenseCreateRequest(BaseModel):
     amount: float
     date: Optional[datetime] = None  # If none, we use current time
     notes: Optional[str] = None
+    audio_note_url: Optional[str] = None
     receipt_url: Optional[str] = None
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
@@ -21,6 +22,7 @@ class ExpenseResponse(BaseModel):
     amount: float
     date: datetime
     notes: Optional[str] = None
+    audio_note_url: Optional[str] = None
     receipt_url: Optional[str] = None
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
