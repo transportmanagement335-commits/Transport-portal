@@ -30,6 +30,8 @@ class VehicleCreateRequest(BaseModel):
     bus_category: Optional[str] = None
     bus_layout: Optional[str] = None
     seating_capacity: Optional[str] = None
+    amenities: list[str] = []
+    is_ac: Optional[bool] = None
 
 
 class VehicleUpdateRequest(BaseModel):
@@ -52,6 +54,8 @@ class VehicleUpdateRequest(BaseModel):
     bus_category: Optional[str] = None
     bus_layout: Optional[str] = None
     seating_capacity: Optional[str] = None
+    amenities: Optional[list[str]] = None
+    is_ac: Optional[bool] = None
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Response schemas
@@ -78,6 +82,8 @@ class VehicleResponse(BaseModel):
     bus_category: Optional[str] = None
     bus_layout: Optional[str] = None
     seating_capacity: Optional[str] = None
+    amenities: list[str] = []
+    is_ac: Optional[bool] = None
 
 
 # ──────────────────────────────────────────────────────────────────────────────

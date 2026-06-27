@@ -38,6 +38,8 @@ class VehicleInDB(BaseModel):
     bus_category: Optional[str] = None
     bus_layout: Optional[str] = None
     seating_capacity: Optional[str] = None
+    amenities: list[str] = Field(default_factory=list)
+    is_ac: Optional[bool] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
