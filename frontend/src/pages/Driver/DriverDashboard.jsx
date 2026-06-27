@@ -153,6 +153,7 @@ function DriverDashboard() {
   const audioChunksRef = useRef([]);
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
+  const recognitionRef = useRef(null);
 
   // Docs Modal State
   const [showDocsModal, setShowDocsModal] = useState(false);
@@ -382,6 +383,9 @@ function DriverDashboard() {
       if (mediaRecorderRef.current) {
         mediaRecorderRef.current.stop();
       }
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
       setIsRecording(false);
     } else {
       try {
@@ -401,6 +405,29 @@ function DriverDashboard() {
           stream.getTracks().forEach(track => track.stop());
         };
 
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          const recognition = new SpeechRecognition();
+          recognitionRef.current = recognition;
+          recognition.lang = "en-IN";
+          recognition.interimResults = false;
+          recognition.continuous = false;
+
+          recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            setExpenseForm(prev => ({
+              ...prev,
+              notes: prev.notes ? prev.notes + " " + transcript : transcript
+            }));
+          };
+
+          recognition.onerror = (event) => {
+            console.error("Speech recognition error", event.error);
+          };
+
+          recognition.start();
+        }
+
         mediaRecorder.start();
         setIsRecording(true);
       } catch (err) {
@@ -412,6 +439,10 @@ function DriverDashboard() {
   async function handleAddExpense(e) {
     e.preventDefault();
     if (!trip?.id || !expenseForm.amount) return;
+    if (!receiptFile) {
+      alert("Please upload a receipt/bill image.");
+      return;
+    }
     try {
       setSavingExpense(true);
 

@@ -6,7 +6,7 @@ import "leaflet/dist/leaflet.css";
 
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { tripsAPI, expensesAPI, vehiclesAPI, invoicesAPI, notificationsAPI, WS_BASE_URL, SERVER_URL, requireAuth } from "../../api";
+import { tripsAPI, expensesAPI, vehiclesAPI, invoicesAPI, notificationsAPI, uploadAPI, WS_BASE_URL, SERVER_URL, requireAuth } from "../../api";
 import "../../styles/Admin/AdminDashboard.css";
 import "../../styles/Admin/Trips.css";
 import "../../styles/Admin/TripDetails.css";
@@ -136,8 +136,9 @@ function TripDetails() {
   // ── Expenses ─────────────────────────────────────────────────────────────
   const [expenses, setExpenses]             = useState([]);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [expenseForm, setExpenseForm]       = useState({ category: "Fuel", amount: "", notes: "" });
+  const [expenseForm, setExpenseForm]       = useState({ category: "Fuel", amount: "", notes: "", receipt_url: "" });
   const [expenseSaving, setExpenseSaving]   = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // ── Freight Docs ─────────────────────────────────────────────────────────
   const [freightDocsMode, setFreightDocsMode] = useState(false);
@@ -370,6 +371,10 @@ function TripDetails() {
   async function handleAddExpense(e) {
     e.preventDefault();
     if (!expenseForm.amount) return;
+    if (!expenseForm.receipt_url) {
+      alert("Please upload a receipt/bill image.");
+      return;
+    }
     try {
       setExpenseSaving(true);
       await expensesAPI.create({
@@ -377,12 +382,13 @@ function TripDetails() {
         trip_id: tripData.id,
         category: expenseForm.category,
         amount: parseFloat(expenseForm.amount),
-        notes: expenseForm.notes
+        notes: expenseForm.notes,
+        receipt_url: expenseForm.receipt_url
       });
       const updated = await expensesAPI.getByTrip(tripData.id);
       setExpenses(updated);
       setShowExpenseForm(false);
-      setExpenseForm({ category: "Fuel", amount: "", notes: "" });
+      setExpenseForm({ category: "Fuel", amount: "", notes: "", receipt_url: "" });
     } catch (err) {
       alert("Failed to add expense: " + err.message);
     } finally {
@@ -693,6 +699,28 @@ function TripDetails() {
                 onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
                 style={{ flex: 1 }}
               />
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    setUploadingImage(true);
+                    try {
+                      const data = await uploadAPI.uploadFile(file);
+                      setExpenseForm(prev => ({ ...prev, receipt_url: data.url }));
+                    } catch (err) {
+                      alert("Image upload failed: " + err.message);
+                    } finally {
+                      setUploadingImage(false);
+                    }
+                  }}
+                  style={{ width: "180px", padding: "6px", fontSize: "12px" }}
+                  required
+                />
+                {uploadingImage && <span style={{fontSize: "10px", color: "#2563eb"}}>Uploading...</span>}
+              </div>
               <button
                 type="submit"
                 className="btn-primary"

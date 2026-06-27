@@ -67,6 +67,10 @@ const Expenses = () => {
       alert("Please select a trip and enter an amount");
       return;
     }
+    if (!expenseForm.receipt_url) {
+      alert("Please upload a receipt/bill image.");
+      return;
+    }
     try {
       setExpenseSaving(true);
       const trip = trips.find(t => t.id === expenseForm.trip_id);
