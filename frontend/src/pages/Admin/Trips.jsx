@@ -328,11 +328,12 @@ function Trips() {
   const completedCount = trips.filter((t) => t.trip_status === "Completed").length;
 
   return (
-    <div className="dashboard-layout">
-      <Sidebar sidebarOpen={sidebarOpen} />
+    <>
+      <div className="dashboard-layout">
+        <Sidebar sidebarOpen={sidebarOpen} />
 
-      <div className={`trips-content ${sidebarOpen ? "sidebar-open" : "sidebar-close"}`}>
-        <Topbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        <div className={`trips-content ${sidebarOpen ? "sidebar-open" : "sidebar-close"}`}>
+          <Topbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
         {error && (
           <div className="trips-error-banner">⚠ {error}</div>
@@ -1022,6 +1023,7 @@ function Trips() {
         </div>
       </div>
     )}
+    </>
   );
 }
 
