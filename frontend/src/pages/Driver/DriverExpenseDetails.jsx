@@ -196,7 +196,21 @@ function DriverExpenseDetails() {
                             <td>
                               {expense.notes && <p style={{margin: 0, fontSize: "13px"}}>{expense.notes}</p>}
                               {expense.audio_note_url && (
-                                <audio src={`http://localhost:8000${expense.audio_note_url}`} controls style={{ height: "30px", width: "120px", marginTop: "4px" }} />
+                                <audio 
+                                  src={`http://localhost:8000${expense.audio_note_url}`} 
+                                  controls 
+                                  onLoadedMetadata={(e) => {
+                                    const audio = e.target;
+                                    if (audio.duration === Infinity || isNaN(audio.duration) || audio.duration === 0) {
+                                      audio.currentTime = 1e101;
+                                      audio.ontimeupdate = () => {
+                                        audio.ontimeupdate = null;
+                                        audio.currentTime = 0;
+                                      };
+                                    }
+                                  }}
+                                  style={{ height: "30px", width: "120px", marginTop: "4px" }} 
+                                />
                               )}
                             </td>
 

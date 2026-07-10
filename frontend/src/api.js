@@ -274,3 +274,13 @@ export const invoicesAPI = {
 export const notificationsAPI = {
   sendWhatsAppMessage: (body) => apiFetch("/send-whatsapp-message", { method: "POST", body: JSON.stringify(body) }),
 };
+
+// ─── Inquiries (Bus lead pipeline) ────────────────────────────────────────────
+
+export const inquiriesAPI = {
+  list:   ()         => apiFetch("/inquiries/"),
+  create: (body)     => apiFetch("/inquiries/", { method: "POST", body: JSON.stringify(body) }),
+  update: (id, body) => apiFetch(`/inquiries/${id}`, { method: "PUT",    body: JSON.stringify(body) }),
+  delete: (id)       => apiFetch(`/inquiries/${id}`, { method: "DELETE" }),
+};
+

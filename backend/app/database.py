@@ -78,5 +78,11 @@ async def create_indexes():
     # counters — for atomic invoice number generation (unique per owner+year key)
     # _id is automatically unique in MongoDB, no extra index needed
 
+    # inquiries — index by owner_id, and composite by owner+date for lead pipeline views
+    await database.inquiries.create_index("owner_id")
+    await database.inquiries.create_index([("owner_id", 1), ("journey_date", 1)])
+    await database.inquiries.create_index([("owner_id", 1), ("status", 1)])
+
     print("[SUCCESS] Database indexes created")
+
 

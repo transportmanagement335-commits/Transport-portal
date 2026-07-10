@@ -397,7 +397,21 @@ const Expenses = () => {
                             <td style={{ padding: "12px 20px", color: "#64748b" }}>
                               {expense.notes || "—"}
                               {expense.audio_note_url && (
-                                <audio src={SERVER_URL + expense.audio_note_url} controls style={{ height: "30px", width: "150px", display: "block", marginTop: "4px" }} />
+                                <audio 
+                                  src={SERVER_URL + expense.audio_note_url} 
+                                  controls 
+                                  onLoadedMetadata={(e) => {
+                                    const audio = e.target;
+                                    if (audio.duration === Infinity || isNaN(audio.duration) || audio.duration === 0) {
+                                      audio.currentTime = 1e101;
+                                      audio.ontimeupdate = () => {
+                                        audio.ontimeupdate = null;
+                                        audio.currentTime = 0;
+                                      };
+                                    }
+                                  }}
+                                  style={{ height: "30px", width: "150px", display: "block", marginTop: "4px" }} 
+                                />
                               )}
                             </td>
                             <td style={{ padding: "12px 20px" }}>{expense.recorded_by}</td>

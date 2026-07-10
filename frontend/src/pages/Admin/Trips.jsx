@@ -6,11 +6,12 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Sidebar from "../../components/Admin/Sidebar";
 import Topbar from "../../components/Admin/Topbar";
-import { tripsAPI, vehiclesAPI, customersAPI, requireAuth, WS_BASE_URL } from "../../api";
+import { tripsAPI, vehiclesAPI, customersAPI, requireAuth, WS_BASE_URL, inquiriesAPI } from "../../api";
 
 import "../../styles/Admin/AdminDashboard.css";
 import "../../styles/Admin/Trips.css";
 import "../../styles/Admin/TripDetails.css";
+import "../../styles/Admin/Inquiries.css";
 
 // ── Fix Leaflet default marker icons ──────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -62,6 +63,28 @@ function Trips() {
   const [liveLocations, setLiveLocations] = useState({});
   const wsRef = useRef(null);
 
+  // ── Inquiry state ────────────────────────────────────────────────────────────
+  const [showInquiryForm, setShowInquiryForm]   = useState(false);
+  const [inquiries, setInquiries]               = useState([]);
+  const [inquiriesOpen, setInquiriesOpen]       = useState(true);
+  const [savingInquiry, setSavingInquiry]       = useState(false);
+  const BLANK_INQUIRY = {
+    customer_name: "",
+    customer_phone: "",
+    num_passengers: "",
+    journey_date: "",
+    return_date: "",
+    pickup_point: "",
+    pickup_time: "",
+    drop_location: "",
+    return_time: "",
+    total_duty_days: "",
+    ac_type: "Non AC",
+    vehicle_category: "Mini Bus",
+    notes: "",
+  };
+  const [inquiryForm, setInquiryForm] = useState(BLANK_INQUIRY);
+
   const [formData, setFormData] = useState({
     vehicle_id: "",
     client_name: "",
@@ -78,6 +101,7 @@ function Trips() {
     fetchTrips();
     fetchVehicles();
     fetchCustomers();
+    fetchInquiries();
   }, []);
 
   // Initialize live locations from initial fetch
@@ -141,6 +165,62 @@ function Trips() {
       setCustomers(data.filter((c) => c.is_active));
     } catch (err) {
       console.error("Failed to load customers:", err);
+    }
+  }
+
+  async function fetchInquiries() {
+    try {
+      const data = await inquiriesAPI.list();
+      setInquiries(data);
+    } catch (err) {
+      console.error("Failed to load inquiries:", err);
+    }
+  }
+
+  function handleInquiryChange(e) {
+    setInquiryForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  async function handleSaveInquiry() {
+    const { customer_name, num_passengers, journey_date, pickup_point, pickup_time, drop_location, total_duty_days } = inquiryForm;
+    if (!customer_name || !num_passengers || !journey_date || !pickup_point || !pickup_time || !drop_location || !total_duty_days) {
+      alert("Please fill all required fields.");
+      return;
+    }
+    try {
+      setSavingInquiry(true);
+      const payload = {
+        ...inquiryForm,
+        num_passengers:  parseInt(inquiryForm.num_passengers)  || 0,
+        total_duty_days: parseInt(inquiryForm.total_duty_days) || 0,
+      };
+      const created = await inquiriesAPI.create(payload);
+      setInquiries((prev) => [created, ...prev]);
+      setInquiryForm(BLANK_INQUIRY);
+      setShowInquiryForm(false);
+    } catch (err) {
+      alert("Failed to save inquiry: " + err.message);
+    } finally {
+      setSavingInquiry(false);
+    }
+  }
+
+  async function handleUpdateInquiryStatus(id, status) {
+    try {
+      const updated = await inquiriesAPI.update(id, { status });
+      setInquiries((prev) => prev.map((inq) => (inq.id === id ? updated : inq)));
+    } catch (err) {
+      alert("Failed to update inquiry: " + err.message);
+    }
+  }
+
+  async function handleDeleteInquiry(id) {
+    if (!window.confirm("Delete this inquiry? This cannot be undone.")) return;
+    try {
+      await inquiriesAPI.delete(id);
+      setInquiries((prev) => prev.filter((inq) => inq.id !== id));
+    } catch (err) {
+      alert("Failed to delete inquiry: " + err.message);
     }
   }
 
@@ -267,6 +347,9 @@ function Trips() {
           <div className="trips-header-actions">
             <button className="btn-danger" onClick={handleClearAll} disabled={loading || trips.length === 0}>
               Clear All Trips
+            </button>
+            <button className="btn-inquiry" onClick={() => { setShowInquiryForm(true); setInquiryForm(BLANK_INQUIRY); }}>
+              📋 New Inquiry
             </button>
             <button className="btn-trip" onClick={() => setShowForm(!showForm)}>
               {showForm ? "Hide Form" : "+ Create Trip"}
@@ -621,8 +704,324 @@ function Trips() {
           )}
         </div>
 
+        {/* ── Inquiry Panel ── */}
+        <div className="inq-panel">
+          <div className="inq-panel-header" onClick={() => setInquiriesOpen((o) => !o)}>
+            <div className="inq-panel-header-left">
+              <div>
+                <h3>📋 Bus Inquiries &amp; Leads</h3>
+                <p>Customer calls logged — track your lead pipeline here.</p>
+              </div>
+              <span className="inq-count-badge">{inquiries.length}</span>
+            </div>
+            <span className={`inq-toggle-icon ${inquiriesOpen ? "open" : ""}`}>▾</span>
+          </div>
+
+          {inquiriesOpen && (
+            <div className="inq-cards-container">
+              {inquiries.length === 0 ? (
+                <div className="inq-empty">
+                  <div style={{ fontSize: "2rem", marginBottom: "8px" }}>📞</div>
+                  <p>No inquiries yet. Click &ldquo;New Inquiry&rdquo; to log your first call.</p>
+                </div>
+              ) : (
+                <div className="inq-cards-grid">
+                  {inquiries.map((inq) => (
+                    <div key={inq.id} className="inq-card">
+                      {/* Top row — name + status */}
+                      <div className="inq-card-top">
+                        <div>
+                          <div className="inq-card-name">👤 {inq.customer_name}</div>
+                          {inq.customer_phone && (
+                            <div className="inq-card-phone">📱 {inq.customer_phone}</div>
+                          )}
+                        </div>
+                        <span className={`inq-status ${inq.status === "Open" ? "open" : inq.status === "Converted" ? "converted" : "lost"}`}>
+                          {inq.status}
+                        </span>
+                      </div>
+
+                      {/* Key details grid */}
+                      <div className="inq-card-details">
+                        <div className="inq-detail-row">
+                          <span className="inq-detail-emoji">👥</span>
+                          <span>{inq.num_passengers} passengers</span>
+                        </div>
+                        <div className="inq-detail-row">
+                          <span className="inq-detail-emoji">📅</span>
+                          <span>{inq.journey_date}</span>
+                        </div>
+                        <div className="inq-detail-row">
+                          <span className="inq-detail-emoji">📍</span>
+                          <span>{inq.pickup_point}</span>
+                        </div>
+                        <div className="inq-detail-row">
+                          <span className="inq-detail-emoji">🏁</span>
+                          <span>{inq.drop_location}</span>
+                        </div>
+                        <div className="inq-detail-row">
+                          <span className="inq-detail-emoji">🕐</span>
+                          <span>{inq.pickup_time}{inq.return_time ? ` · Return ${inq.return_time}` : ""}</span>
+                        </div>
+                        {inq.return_date && (
+                          <div className="inq-detail-row">
+                            <span className="inq-detail-emoji">🔁</span>
+                            <span>Return {inq.return_date}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Chips */}
+                      <div className="inq-card-chips">
+                        <span className="inq-chip ac">{inq.ac_type}</span>
+                        <span className="inq-chip bus">{inq.vehicle_category}</span>
+                        <span className="inq-chip days">🗓 {inq.total_duty_days} {inq.total_duty_days === 1 ? "day" : "days"}</span>
+                      </div>
+
+                      {/* Notes */}
+                      {inq.notes && (
+                        <div className="inq-card-notes">💬 {inq.notes}</div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="inq-card-actions">
+                        {inq.status !== "Converted" && (
+                          <button
+                            className="inq-action-btn convert"
+                            onClick={() => handleUpdateInquiryStatus(inq.id, "Converted")}
+                          >
+                            ✅ Converted
+                          </button>
+                        )}
+                        {inq.status !== "Lost" && (
+                          <button
+                            className="inq-action-btn lost"
+                            onClick={() => handleUpdateInquiryStatus(inq.id, "Lost")}
+                          >
+                            ✗ Lost
+                          </button>
+                        )}
+                        {inq.status === "Lost" && (
+                          <button
+                            className="inq-action-btn convert"
+                            onClick={() => handleUpdateInquiryStatus(inq.id, "Open")}
+                          >
+                            ↩ Reopen
+                          </button>
+                        )}
+                        <button
+                          className="inq-action-btn del"
+                          onClick={() => handleDeleteInquiry(inq.id)}
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
+
+    {/* ── Inquiry Drawer ── */}
+    {showInquiryForm && (
+      <div className="inq-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowInquiryForm(false); }}>
+        <div className="inq-drawer">
+          {/* Header */}
+          <div className="inq-drawer-header">
+            <div>
+              <h2>📋 Log Bus Inquiry</h2>
+              <p>Record details from a customer call</p>
+            </div>
+            <button className="inq-close-btn" onClick={() => setShowInquiryForm(false)}>✕</button>
+          </div>
+
+          {/* Body */}
+          <div className="inq-drawer-body">
+
+            {/* Customer Details */}
+            <div className="inq-section-title">Customer Details</div>
+            <div className="inq-form-grid">
+              <label className="inq-label inq-full">
+                <span><span className="inq-emoji">👤</span> Customer Name <span style={{ color: "#ef4444" }}>*</span></span>
+                <input
+                  id="inq-customer-name"
+                  className="inq-input"
+                  name="customer_name"
+                  value={inquiryForm.customer_name}
+                  onChange={handleInquiryChange}
+                  placeholder="e.g. Ramesh Patel"
+                />
+              </label>
+              <label className="inq-label inq-full">
+                <span><span className="inq-emoji">📱</span> Phone Number</span>
+                <input
+                  className="inq-input"
+                  name="customer_phone"
+                  value={inquiryForm.customer_phone}
+                  onChange={handleInquiryChange}
+                  placeholder="e.g. 9876543210"
+                />
+              </label>
+            </div>
+
+            {/* Journey Details */}
+            <div className="inq-section-title">Journey Details</div>
+            <div className="inq-form-grid">
+              <label className="inq-label">
+                <span><span className="inq-emoji">👥</span> Number of Passengers <span style={{ color: "#ef4444" }}>*</span></span>
+                <input
+                  className="inq-input"
+                  type="number"
+                  name="num_passengers"
+                  value={inquiryForm.num_passengers}
+                  onChange={handleInquiryChange}
+                  placeholder="e.g. 40"
+                  min="1"
+                />
+              </label>
+              <label className="inq-label">
+                <span><span className="inq-emoji">🗓</span> Total Duty Days <span style={{ color: "#ef4444" }}>*</span></span>
+                <input
+                  className="inq-input"
+                  type="number"
+                  name="total_duty_days"
+                  value={inquiryForm.total_duty_days}
+                  onChange={handleInquiryChange}
+                  placeholder="e.g. 3"
+                  min="1"
+                />
+              </label>
+              <label className="inq-label">
+                <span><span className="inq-emoji">📅</span> Date of Journey <span style={{ color: "#ef4444" }}>*</span></span>
+                <input
+                  className="inq-input"
+                  type="date"
+                  name="journey_date"
+                  value={inquiryForm.journey_date}
+                  onChange={handleInquiryChange}
+                />
+              </label>
+              <label className="inq-label">
+                <span><span className="inq-emoji">🔁</span> Return Date of Journey</span>
+                <input
+                  className="inq-input"
+                  type="date"
+                  name="return_date"
+                  value={inquiryForm.return_date}
+                  onChange={handleInquiryChange}
+                />
+              </label>
+            </div>
+
+            {/* Pickup & Drop */}
+            <div className="inq-section-title">Pickup &amp; Drop</div>
+            <div className="inq-form-grid">
+              <label className="inq-label">
+                <span><span className="inq-emoji">📍</span> Pickup Point <span style={{ color: "#ef4444" }}>*</span></span>
+                <input
+                  className="inq-input"
+                  name="pickup_point"
+                  value={inquiryForm.pickup_point}
+                  onChange={handleInquiryChange}
+                  placeholder="e.g. Nashik CBS"
+                />
+              </label>
+              <label className="inq-label">
+                <span><span className="inq-emoji">🏁</span> Drop Location <span style={{ color: "#ef4444" }}>*</span></span>
+                <input
+                  className="inq-input"
+                  name="drop_location"
+                  value={inquiryForm.drop_location}
+                  onChange={handleInquiryChange}
+                  placeholder="e.g. Shirdi"
+                />
+              </label>
+              <label className="inq-label">
+                <span><span className="inq-emoji">🕐</span> Pickup Time <span style={{ color: "#ef4444" }}>*</span></span>
+                <input
+                  className="inq-input"
+                  type="time"
+                  name="pickup_time"
+                  value={inquiryForm.pickup_time}
+                  onChange={handleInquiryChange}
+                />
+              </label>
+              <label className="inq-label">
+                <span><span className="inq-emoji">🕐</span> Return Time</span>
+                <input
+                  className="inq-input"
+                  type="time"
+                  name="return_time"
+                  value={inquiryForm.return_time}
+                  onChange={handleInquiryChange}
+                />
+              </label>
+            </div>
+
+            {/* Vehicle Preference */}
+            <div className="inq-section-title">Vehicle Preference</div>
+            <div className="inq-form-grid">
+              <label className="inq-label">
+                <span><span className="inq-emoji">❄️</span> AC / Non AC</span>
+                <select
+                  className="inq-input"
+                  name="ac_type"
+                  value={inquiryForm.ac_type}
+                  onChange={handleInquiryChange}
+                >
+                  <option value="Non AC">Non AC</option>
+                  <option value="AC">AC</option>
+                </select>
+              </label>
+              <label className="inq-label">
+                <span><span className="inq-emoji">🚌</span> Vehicle Type</span>
+                <select
+                  className="inq-input"
+                  name="vehicle_category"
+                  value={inquiryForm.vehicle_category}
+                  onChange={handleInquiryChange}
+                >
+                  <option value="Car">Car</option>
+                  <option value="Mini Bus">Mini Bus</option>
+                  <option value="Bus">Bus</option>
+                </select>
+              </label>
+            </div>
+
+            {/* Notes */}
+            <div className="inq-section-title">Additional Notes</div>
+            <div className="inq-form-grid">
+              <label className="inq-label inq-full">
+                <span><span className="inq-emoji">💬</span> Notes</span>
+                <textarea
+                  className="inq-input"
+                  name="notes"
+                  value={inquiryForm.notes}
+                  onChange={handleInquiryChange}
+                  placeholder="e.g. I am from Samadhan Travel — any special requirements..."
+                  rows={3}
+                  style={{ resize: "vertical" }}
+                />
+              </label>
+            </div>
+
+          </div>
+
+          {/* Footer */}
+          <div className="inq-drawer-footer">
+            <button className="inq-btn-cancel" onClick={() => setShowInquiryForm(false)}>Cancel</button>
+            <button className="inq-btn-save" onClick={handleSaveInquiry} disabled={savingInquiry}>
+              {savingInquiry ? "Saving..." : "💾 Save Inquiry"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }
 

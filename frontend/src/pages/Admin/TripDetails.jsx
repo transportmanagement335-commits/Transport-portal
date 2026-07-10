@@ -750,7 +750,21 @@ function TripDetails() {
                       {exp.location_lat && <a href={`https://maps.google.com/?q=${exp.location_lat},${exp.location_lng}`} target="_blank" rel="noreferrer" style={{ marginLeft: 8, color: "#10b981", textDecoration: "none" }}>📍 Geotagged</a>}
                     </div>
                     {exp.audio_note_url && (
-                      <audio src={`${SERVER_URL}${exp.audio_note_url}`} controls style={{ height: "30px", width: "200px", marginTop: "8px" }} />
+                      <audio 
+                        src={`${SERVER_URL}${exp.audio_note_url}`} 
+                        controls 
+                        onLoadedMetadata={(e) => {
+                          const audio = e.target;
+                          if (audio.duration === Infinity || isNaN(audio.duration) || audio.duration === 0) {
+                            audio.currentTime = 1e101;
+                            audio.ontimeupdate = () => {
+                              audio.ontimeupdate = null;
+                              audio.currentTime = 0;
+                            };
+                          }
+                        }}
+                        style={{ height: "30px", width: "200px", marginTop: "8px" }} 
+                      />
                     )}
                   </div>
                   <div style={{ fontWeight: 600, color: "#ef4444" }}>₹{exp.amount.toLocaleString()}</div>
