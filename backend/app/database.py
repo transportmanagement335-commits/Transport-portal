@@ -12,6 +12,7 @@ db = Database()
 
 async def connect_to_mongo():
     """Initialize MongoDB connection on app startup."""
+    # Note: mongodb+srv:// already implies TLS — do not pass tls=True explicitly.
     db.client = AsyncIOMotorClient(settings.MONGO_URI)
     # Ping to verify connection
     await db.client.admin.command("ping")
