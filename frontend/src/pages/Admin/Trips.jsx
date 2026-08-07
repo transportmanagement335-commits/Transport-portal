@@ -153,6 +153,7 @@ function Trips() {
   async function fetchVehicles() {
     try {
       const data = await vehiclesAPI.list();
+      setAllVehicles(data);
       setVehicles(data.filter((v) => v.status === "Active"));
     } catch (err) {
       console.error("Failed to load vehicles:", err);
@@ -670,7 +671,7 @@ function Trips() {
                         )}
                       </div>
                       {(() => {
-                        const vehicle = vehicles.find(v => v.id === trip.vehicle_id);
+                        const vehicle = allVehicles.find(v => v.id === trip.vehicle_id);
                         if (!vehicle) return null;
                         
                         if (vehicle.type?.toLowerCase() === "bus") {
