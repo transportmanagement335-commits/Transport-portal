@@ -491,3 +491,6 @@
 .td-payment-link a:hover {
   text-decoration: underline;
 }
+
+.trips-cell-subinfo { font-size: 12px; color: #64748b; margin-top: 2px; }
+

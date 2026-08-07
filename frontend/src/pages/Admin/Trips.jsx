@@ -669,6 +669,28 @@ function Trips() {
                             : <span title="Missing freight docs" style={{ fontSize: "14px" }}>⚠️</span>
                         )}
                       </div>
+                      {(() => {
+                        const vehicle = vehicles.find(v => v.id === trip.vehicle_id);
+                        if (!vehicle) return null;
+                        
+                        if (vehicle.type?.toLowerCase() === "bus") {
+                          const parts = [vehicle.bus_type, vehicle.bus_category, vehicle.bus_layout, vehicle.seating_capacity].filter(Boolean);
+                          if (parts.length > 0) {
+                            return <div className="trips-cell-subinfo" style={{ fontWeight: 600, color: "#071739" }}>Bus<br /><span style={{ fontWeight: 400, color: "#64748b" }}>{parts.join(" • ")}</span></div>;
+                          }
+                          return <div className="trips-cell-subinfo" style={{ fontWeight: 600, color: "#071739" }}>Bus</div>;
+                        }
+                        
+                        if (vehicle.type?.toLowerCase() === "truck") {
+                          const parts = [vehicle.truck_size, vehicle.body_type, vehicle.truck_category].filter(Boolean);
+                          if (parts.length > 0) {
+                            return <div className="trips-cell-subinfo" style={{ fontWeight: 600, color: "#071739" }}>Truck<br /><span style={{ fontWeight: 400, color: "#64748b" }}>{parts.join(" • ")}</span></div>;
+                          }
+                          return <div className="trips-cell-subinfo" style={{ fontWeight: 600, color: "#071739" }}>Truck</div>;
+                        }
+
+                        return <div className="trips-cell-subinfo" style={{ fontWeight: 600, color: "#071739" }}>{vehicle.type}</div>;
+                      })()}
                       <div className="trips-cell-secondary">{trip.driver_name}</div>
                     </td>
                     <td>
