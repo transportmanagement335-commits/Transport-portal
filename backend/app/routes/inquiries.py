@@ -104,6 +104,33 @@ async def update_inquiry(
     )
     if not result:
         raise HTTPException(status_code=404, detail="Inquiry not found")
+
+    # If the inquiry was just converted, auto-add to customers if not exists
+    if updates.get("status") == "Converted":
+        customer_query = {"owner_id": current_owner.id}
+        if result.get("customer_phone"):
+            customer_query["phone"] = result["customer_phone"]
+        else:
+            customer_query["name"] = result["customer_name"]
+            
+        existing_customer = await db.customers.find_one(customer_query)
+        if not existing_customer:
+            now = datetime.utcnow()
+            new_customer = {
+                "owner_id": current_owner.id,
+                "name": result["customer_name"],
+                "contact_person": None,
+                "email": None,
+                "phone": result.get("customer_phone"),
+                "address": None,
+                "gst_number": None,
+                "payment_terms_days": 30,
+                "is_active": True,
+                "created_at": now,
+                "updated_at": now,
+            }
+            await db.customers.insert_one(new_customer)
+
     return _to_response(result)
 
 
