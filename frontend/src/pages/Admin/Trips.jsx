@@ -50,6 +50,7 @@ function Trips() {
   const [statusFilter, setStatusFilter] = useState("All");
 
   const [trips, setTrips] = useState([]);
+  const [allVehicles, setAllVehicles] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
