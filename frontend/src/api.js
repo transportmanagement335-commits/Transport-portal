@@ -284,3 +284,18 @@ export const inquiriesAPI = {
   delete: (id)       => apiFetch(`/inquiries/${id}`, { method: "DELETE" }),
 };
 
+
+
+// ─── Maintenance ────────────────────────────────────────────────────────────
+
+// ─── Maintenance ────────────────────────────────────────────────────────────
+
+// ─── Maintenance ────────────────────────────────────────────────────────────
+
+export const maintenanceAPI = {
+  list:   ()       => apiFetch("/maintenance"),
+  get:    (id)     => apiFetch(`/maintenance/${id}`),
+  create: (body)   => apiFetch("/maintenance", { method: "POST", body: JSON.stringify(body) }),
+  update: (id, body) => apiFetch(`/maintenance/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  delete: (id)     => apiFetch(`/maintenance/${id}`, { method: "DELETE" }),
+};
