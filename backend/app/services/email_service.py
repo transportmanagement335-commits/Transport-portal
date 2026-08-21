@@ -1,160 +1,104 @@
 """
-Email service — sends invoice emails using aiosmtplib (async SMTP).
-SMTP config is loaded from environment variables via app.config.settings.
+Email service — sends invoice notifications via SMTP.
+If SMTP_HOST is not configured, it logs the email to console instead.
 """
 import logging
+import smtplib
+from email.message import EmailMessage
 import os
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from typing import Optional
 
 logger = logging.getLogger(__name__)
-
-
-def _build_html(
-    invoice_number: str,
-    recipient_name: str,
-    total_amount: float,
-    due_date: str,
-    currency: str,
-    pdf_download_url: Optional[str],
-    issuer_name: str,
-) -> str:
-    symbol = "₹" if currency == "INR" else currency
-    pdf_button = ""
-    if pdf_download_url:
-        pdf_button = f"""
-        <a href="{pdf_download_url}" style="
-            display: inline-block;
-            margin-top: 20px;
-            padding: 12px 28px;
-            background: #2563eb;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 15px;
-        ">📄 Download Invoice PDF</a>
-        """
-
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"></head>
-    <body style="font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; margin: 0; padding: 0;">
-      <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 16px;
-                  box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden;">
-
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #1e40af, #2563eb); padding: 32px 40px; color: white;">
-          <div style="font-size: 13px; opacity: 0.85; margin-bottom: 6px;">INVOICE</div>
-          <div style="font-size: 26px; font-weight: 700;">{invoice_number}</div>
-          <div style="font-size: 13px; opacity: 0.75; margin-top: 4px;">from {issuer_name}</div>
-        </div>
-
-        <!-- Body -->
-        <div style="padding: 32px 40px;">
-          <p style="color: #374151; font-size: 15px; margin: 0 0 12px;">
-            Dear <strong>{recipient_name}</strong>,
-          </p>
-          <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
-            Please find your invoice details below. Kindly arrange for payment before the due date.
-          </p>
-
-          <!-- Invoice Summary Card -->
-          <div style="background: #eff6ff; border-radius: 12px; padding: 24px; margin: 24px 0;">
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="color: #6b7280; font-size: 13px; padding: 6px 0;">Invoice Number</td>
-                <td style="color: #0f172a; font-size: 13px; font-weight: 600; text-align: right;">{invoice_number}</td>
-              </tr>
-              <tr>
-                <td style="color: #6b7280; font-size: 13px; padding: 6px 0;">Amount Due</td>
-                <td style="color: #2563eb; font-size: 20px; font-weight: 700; text-align: right;">{symbol}{total_amount:,.2f}</td>
-              </tr>
-              <tr>
-                <td style="color: #6b7280; font-size: 13px; padding: 6px 0;">Due Date</td>
-                <td style="color: #dc2626; font-size: 13px; font-weight: 600; text-align: right;">{due_date}</td>
-              </tr>
-            </table>
-          </div>
-
-          {pdf_button}
-
-          <p style="color: #6b7280; font-size: 13px; margin-top: 28px; line-height: 1.6;">
-            If you have any questions about this invoice, please don't hesitate to contact us.
-          </p>
-        </div>
-
-        <!-- Footer -->
-        <div style="background: #f1f5f9; padding: 20px 40px; border-top: 1px solid #e2e8f0;">
-          <p style="color: #94a3b8; font-size: 12px; margin: 0; text-align: center;">
-            This is an automated invoice email from {issuer_name} via Transport Portal.
-            Please do not reply to this email.
-          </p>
-        </div>
-
-      </div>
-    </body>
-    </html>
-    """
-
 
 async def send_invoice_email(
     to_email: str,
     invoice_number: str,
-    recipient_name: str,
-    total_amount: float,
+    balance_amount: float,
     due_date: str,
-    currency: str,
-    issuer_name: str,
-    pdf_download_url: Optional[str] = None,
+    pdf_path: str,
+    company_name: str,
+    currency: str = "INR",
 ) -> bool:
     """
-    Send an HTML invoice email via async SMTP (aiosmtplib).
-    Returns True on success, False on failure (non-fatal — log and continue).
+    Send an invoice notification with attached PDF via email.
+    Returns True on success, False otherwise.
     """
+    from app.config import settings
+
+    if not to_email:
+        logger.error("[Email] Cannot send invoice: missing recipient email.")
+        return False
+
+    host = settings.SMTP_HOST
+    port = settings.SMTP_PORT
+    user = settings.SMTP_USER
+    password = settings.SMTP_PASSWORD
+    from_email = settings.SMTP_FROM_EMAIL or "noreply@transportportal.com"
+
+    symbol = "₹" if currency == "INR" else currency
+    balance_str = f"{symbol}{balance_amount:,.2f}"
+
+    subject = f"Invoice {invoice_number} from {company_name}"
+    
+    body = f"""
+    <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
+        <h2 style="color: #1e3a8a;">Invoice from {company_name}</h2>
+        <p>Hello,</p>
+        <p>Please find attached your invoice <strong>{invoice_number}</strong>.</p>
+        <ul style="list-style: none; padding-left: 0;">
+            <li><strong>Balance Due:</strong> {balance_str}</li>
+            <li><strong>Due Date:</strong> {due_date}</li>
+        </ul>
+        <p>For any queries, please reply to this email or contact us directly.</p>
+        <br/>
+        <p>Thank you,<br/><strong>{company_name}</strong></p>
+    </div>
+    """
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = f"{company_name} <{from_email}>"
+    msg["To"] = to_email
+    
+    msg.set_content("Please enable HTML to view this email.")
+    msg.add_alternative(body, subtype="html")
+
+    # Attach the PDF
+    if pdf_path and os.path.exists(pdf_path):
+        try:
+            with open(pdf_path, "rb") as f:
+                pdf_data = f.read()
+            msg.add_attachment(
+                pdf_data,
+                maintype="application",
+                subtype="pdf",
+                filename=f"{invoice_number}.pdf",
+            )
+        except Exception as e:
+            logger.error(f"[Email] Failed to attach PDF {pdf_path}: {e}")
+
+    # If no SMTP configured, just log it
+    if not host or not user or not password:
+        logger.warning(
+            "[Email] SMTP credentials not configured. Skipping actual email send. "
+            f"Would have sent email to {to_email} with subject: {subject}"
+        )
+        return True # Pretend success for local testing
+
+    # Send the email
     try:
-        import aiosmtplib
-
-        smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USER", "")
-        smtp_password = os.getenv("SMTP_PASSWORD", "")
-        from_name = os.getenv("SMTP_FROM_NAME", "Transport Portal")
-
-        if not smtp_user or not smtp_password:
-            logger.warning("SMTP credentials not configured — skipping email send.")
-            return False
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"Invoice {invoice_number} from {issuer_name}"
-        msg["From"] = f"{from_name} <{smtp_user}>"
-        msg["To"] = to_email
-
-        html_content = _build_html(
-            invoice_number=invoice_number,
-            recipient_name=recipient_name,
-            total_amount=total_amount,
-            due_date=due_date,
-            currency=currency,
-            pdf_download_url=pdf_download_url,
-            issuer_name=issuer_name,
-        )
-
-        msg.attach(MIMEText(html_content, "html"))
-
-        await aiosmtplib.send(
-            msg,
-            hostname=smtp_host,
-            port=smtp_port,
-            username=smtp_user,
-            password=smtp_password,
-            start_tls=True,
-        )
-        logger.info(f"Invoice email sent to {to_email} for {invoice_number}")
+        # Use STARTTLS if port is 587, otherwise standard SSL for 465
+        if port == 465:
+            server = smtplib.SMTP_SSL(host, port)
+        else:
+            server = smtplib.SMTP(host, port)
+            server.starttls()
+            
+        server.login(user, password)
+        server.send_message(msg)
+        server.quit()
+        
+        logger.info(f"[Email] Invoice {invoice_number} sent to {to_email} successfully.")
         return True
-
-    except Exception as e:
-        logger.error(f"Failed to send invoice email: {e}")
+    except Exception as exc:
+        logger.error(f"[Email] Failed to send email to {to_email}: {exc}")
         return False

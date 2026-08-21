@@ -288,3 +288,317 @@ def generate_invoice_pdf(invoice: dict) -> str:
 
     doc.build(story)
     return file_path
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Business Report PDF
+# ──────────────────────────────────────────────────────────────────────────────
+
+def generate_business_report_pdf(
+    report_data: dict,
+    owner_name: str,
+    range_filter: str,
+) -> str:
+    """
+    Generate an executive-quality A4 PDF business report.
+    Returns the file path where the PDF was saved.
+    """
+    save_dir = os.path.join("uploads", "reports")
+    os.makedirs(save_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_range = range_filter.replace(" ", "_")
+    file_path = os.path.join(save_dir, f"Business_Report_{safe_range}_{timestamp}.pdf")
+
+    doc = SimpleDocTemplate(
+        file_path,
+        pagesize=A4,
+        rightMargin=16 * mm,
+        leftMargin=16 * mm,
+        topMargin=16 * mm,
+        bottomMargin=16 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    kpi = report_data.get("kpi", {})
+    trend = report_data.get("trend", [])
+    insights = report_data.get("aiInsights", [])
+    top_clients = report_data.get("topClients", [])
+    top_vehicles = report_data.get("topVehicles", [])
+    top_drivers = report_data.get("topDrivers", [])
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    header_data = [
+        [
+            Paragraph(
+                f'<font size="18" color="#2563eb"><b>BUSINESS REPORT</b></font>',
+                styles["Normal"],
+            ),
+            Paragraph(
+                f'<font size="9" color="#64748b">Period</font><br/>'
+                f'<font size="12" color="#0f172a"><b>{range_filter}</b></font>',
+                styles["Normal"],
+            ),
+        ],
+        [
+            Paragraph(
+                f'<font size="11" color="#0f172a"><b>{owner_name}</b></font><br/>'
+                f'<font size="8" color="#64748b">Generated: {datetime.now().strftime("%d %b %Y, %I:%M %p")}</font>',
+                styles["Normal"],
+            ),
+            Paragraph(
+                f'<font size="8" color="#64748b">Comprehensive overview of<br/>'
+                f'business performance and insights</font>',
+                styles["Normal"],
+            ),
+        ],
+    ]
+    header_table = Table(header_data, colWidths=[95 * mm, 80 * mm])
+    header_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(header_table)
+    story.append(HRFlowable(width="100%", thickness=1.5, color=BRAND_BLUE, spaceAfter=12))
+
+    # ── KPI Summary ───────────────────────────────────────────────────────────
+    story.append(Paragraph(
+        '<font size="12" color="#2563eb"><b>Key Performance Indicators</b></font>',
+        styles["Normal"],
+    ))
+    story.append(Spacer(1, 6))
+
+    def _kpi_trend_text(val):
+        if val is None:
+            return '<font color="#64748b">—</font>'
+        if val >= 0:
+            return f'<font color="#16a34a">▲ {val}%</font>'
+        return f'<font color="#dc2626">▼ {abs(val)}%</font>'
+
+    kpi_data = [
+        [
+            Paragraph('<font size="7" color="#64748b"><b>METRIC</b></font>', styles["Normal"]),
+            Paragraph('<font size="7" color="#64748b"><b>VALUE</b></font>', styles["Normal"]),
+            Paragraph('<font size="7" color="#64748b"><b>VS PREV PERIOD</b></font>', styles["Normal"]),
+        ],
+        [
+            Paragraph('<font size="9">Total Revenue</font>', styles["Normal"]),
+            Paragraph(f'<font size="9"><b>{_fmt_money(kpi.get("totalRevenue", 0))}</b></font>', styles["Normal"]),
+            Paragraph(f'<font size="8">{_kpi_trend_text(kpi.get("revenueTrend"))}</font>', styles["Normal"]),
+        ],
+        [
+            Paragraph('<font size="9">Total Expense</font>', styles["Normal"]),
+            Paragraph(f'<font size="9"><b>{_fmt_money(kpi.get("totalExpense", 0))}</b></font>', styles["Normal"]),
+            Paragraph(f'<font size="8">{_kpi_trend_text(kpi.get("expenseTrend"))}</font>', styles["Normal"]),
+        ],
+        [
+            Paragraph('<font size="9">Total Profit</font>', styles["Normal"]),
+            Paragraph(f'<font size="9"><b>{_fmt_money(kpi.get("totalProfit", 0))}</b></font>', styles["Normal"]),
+            Paragraph(f'<font size="8">{_kpi_trend_text(kpi.get("profitTrend"))}</font>', styles["Normal"]),
+        ],
+        [
+            Paragraph('<font size="9">Trips Completed</font>', styles["Normal"]),
+            Paragraph(f'<font size="9"><b>{kpi.get("tripsCompleted", 0)}</b></font>', styles["Normal"]),
+            Paragraph(f'<font size="8">{_kpi_trend_text(kpi.get("tripsTrend"))}</font>', styles["Normal"]),
+        ],
+        [
+            Paragraph('<font size="9">Profit Margin</font>', styles["Normal"]),
+            Paragraph(f'<font size="9"><b>{kpi.get("profitMargin", 0)}%</b></font>', styles["Normal"]),
+            Paragraph(f'<font size="8">{_kpi_trend_text(kpi.get("marginTrend"))}</font>', styles["Normal"]),
+        ],
+    ]
+
+    kpi_table = Table(kpi_data, colWidths=[60 * mm, 55 * mm, 55 * mm])
+    kpi_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), BRAND_BLUE),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_50]),
+        ("GRID", (0, 0), (-1, -1), 0.5, GRAY_200),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    story.append(kpi_table)
+    story.append(Spacer(1, 14))
+
+    # ── Monthly Trend Table ───────────────────────────────────────────────────
+    if trend:
+        story.append(Paragraph(
+            '<font size="12" color="#2563eb"><b>Monthly Revenue, Expense &amp; Profit</b></font>',
+            styles["Normal"],
+        ))
+        story.append(Spacer(1, 6))
+
+        trend_header = ["Month", "Revenue (₹)", "Expense (₹)", "Profit (₹)"]
+        trend_rows = [trend_header]
+        for t in trend:
+            trend_rows.append([
+                t.get("month", ""),
+                _fmt_money(t.get("revenue", 0)),
+                _fmt_money(t.get("expense", 0)),
+                _fmt_money(t.get("profit", 0)),
+            ])
+
+        trend_table = Table(trend_rows, colWidths=[35 * mm, 45 * mm, 45 * mm, 45 * mm])
+        trend_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), BRAND_BLUE),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_50]),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRAY_200),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(trend_table)
+        story.append(Spacer(1, 14))
+
+    # ── Top Clients ───────────────────────────────────────────────────────────
+    if top_clients:
+        story.append(Paragraph(
+            '<font size="12" color="#2563eb"><b>Top Performing Clients</b></font>',
+            styles["Normal"],
+        ))
+        story.append(Spacer(1, 6))
+
+        client_rows = [["Client Name", "Trips", "Revenue (₹)", "Profit (₹)", "Growth"]]
+        for c in top_clients:
+            growth = c.get("growth", 0)
+            growth_str = f"▲ {growth}%" if growth >= 0 else f"▼ {abs(growth)}%"
+            client_rows.append([
+                c.get("name", ""),
+                str(c.get("trips", 0)),
+                _fmt_money(c.get("revenue", 0)),
+                _fmt_money(c.get("profit", 0)),
+                growth_str,
+            ])
+
+        client_table = Table(client_rows, colWidths=[45 * mm, 20 * mm, 35 * mm, 35 * mm, 30 * mm])
+        client_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), BRAND_BLUE),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_50]),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRAY_200),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(client_table)
+        story.append(Spacer(1, 14))
+
+    # ── Top Vehicles ──────────────────────────────────────────────────────────
+    if top_vehicles:
+        story.append(Paragraph(
+            '<font size="12" color="#2563eb"><b>Top Performing Vehicles</b></font>',
+            styles["Normal"],
+        ))
+        story.append(Spacer(1, 6))
+
+        vehicle_rows = [["Vehicle No.", "Trips", "Revenue (₹)", "Profit (₹)", "Utilization"]]
+        for v in top_vehicles:
+            vehicle_rows.append([
+                v.get("vehicleNo", ""),
+                str(v.get("trips", 0)),
+                _fmt_money(v.get("revenue", 0)),
+                _fmt_money(v.get("profit", 0)),
+                f'{v.get("utilization", 0)}%',
+            ])
+
+        vehicle_table = Table(vehicle_rows, colWidths=[45 * mm, 20 * mm, 35 * mm, 35 * mm, 30 * mm])
+        vehicle_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), BRAND_BLUE),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_50]),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRAY_200),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(vehicle_table)
+        story.append(Spacer(1, 14))
+
+    # ── Top Drivers ───────────────────────────────────────────────────────────
+    if top_drivers:
+        story.append(Paragraph(
+            '<font size="12" color="#2563eb"><b>Top Performing Drivers</b></font>',
+            styles["Normal"],
+        ))
+        story.append(Spacer(1, 6))
+
+        driver_rows = [["Driver Name", "Trips", "KM Driven", "Revenue (₹)", "Rating"]]
+        for d in top_drivers:
+            km = d.get("kmDriven", 0)
+            km_str = f'{km:,.0f}' if km else "—"
+            rating = d.get("rating")
+            rating_str = f'★ {rating}' if rating is not None else "—"
+            driver_rows.append([
+                d.get("name", ""),
+                str(d.get("trips", 0)),
+                km_str,
+                _fmt_money(d.get("revenue", 0)),
+                rating_str,
+            ])
+
+        driver_table = Table(driver_rows, colWidths=[45 * mm, 20 * mm, 30 * mm, 35 * mm, 30 * mm])
+        driver_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), BRAND_BLUE),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_50]),
+            ("GRID", (0, 0), (-1, -1), 0.5, GRAY_200),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(driver_table)
+        story.append(Spacer(1, 14))
+
+    # ── AI Insights ───────────────────────────────────────────────────────────
+    if insights:
+        story.append(Paragraph(
+            '<font size="12" color="#2563eb"><b>AI Business Insights</b></font>',
+            styles["Normal"],
+        ))
+        story.append(Spacer(1, 6))
+
+        insight_style = ParagraphStyle(
+            "insight", fontSize=8, leading=12, textColor=colors.HexColor("#374151"),
+        )
+        for item in insights:
+            # Strip HTML bold tags for PDF (ReportLab supports them natively)
+            text = item.get("text", "")
+            story.append(Paragraph(f'• {text}', insight_style))
+            story.append(Spacer(1, 3))
+
+        story.append(Spacer(1, 10))
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    story.append(HRFlowable(width="100%", thickness=0.5, color=GRAY_200, spaceAfter=8))
+    story.append(Paragraph(
+        f'<font size="8" color="#64748b">Report generated by {owner_name} Transport Portal — '
+        f'{datetime.now().strftime("%d %b %Y, %I:%M %p")}. '
+        f'This is an auto-generated business intelligence report.</font>',
+        ParagraphStyle("footer", fontSize=8, alignment=TA_CENTER),
+    ))
+
+    doc.build(story)
+    return file_path

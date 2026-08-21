@@ -30,7 +30,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { adminAPI, requireAuth } from "../../api";
+import { adminAPI, reportsAPI, requireAuth } from "../../api";
 import "../../styles/Admin/BusinessReport.css";
 
 const formatINR = (val) => {
@@ -99,11 +99,19 @@ export default function BusinessReport() {
       setLoading(true);
       setError(null);
       const res = await adminAPI.get(`/reports/business?range=${dateRange}`);
-      setReport(res.data);
+      setReport(res);
     } catch (err) {
       setError("Failed to load report. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    try {
+      await reportsAPI.downloadBusinessReportPdf(dateRange);
+    } catch (err) {
+      alert("Failed to download report. Please try again.");
     }
   };
 
@@ -150,7 +158,7 @@ export default function BusinessReport() {
                   <option>This Year</option>
                 </select>
               </div>
-              <button className="br-download-btn">
+              <button className="br-download-btn" onClick={handleDownloadReport}>
                 <FaDownload />
                 Download Report
               </button>

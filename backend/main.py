@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 
 from app.database import close_mongo_connection, connect_to_mongo
-from app.routes import auth, admin, vehicles, driver, trips, expenses, payments, upload, customers, invoices, inquiries
+from app.routes import auth, admin, vehicles, driver, trips, expenses, payments, upload, customers, invoices, inquiries, reports
 from app.services.scheduler_service import start_scheduler, stop_scheduler
 from fastapi.staticfiles import StaticFiles
 import os
@@ -98,6 +98,7 @@ app.include_router(upload.router, prefix="/api/upload", tags=["Upload"])
 app.include_router(customers.router, prefix="/api/customers", tags=["Customers"])
 app.include_router(invoices.router, prefix="/api/invoices", tags=["Invoices"])
 app.include_router(inquiries.router, prefix="/api/inquiries", tags=["Inquiries"])
+app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
 # Mount uploads directory for serving static files
 UPLOAD_DIR = "uploads"

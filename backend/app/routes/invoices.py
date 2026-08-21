@@ -106,10 +106,10 @@ async def generate_from_trip(
 # ──────────────────────────────────────────────────────────────────────────────
 
 @router.post(
-    "/send-whatsapp/{invoice_id}",
-    summary="Generate PDF + send invoice to customer via WhatsApp Business API",
+    "/send/{invoice_id}",
+    summary="Generate PDF + send invoice to customer via WhatsApp and/or Email",
 )
-async def send_invoice_via_whatsapp(
+async def send_invoice(
     invoice_id: str,
     current_owner=Depends(require_owner),
 ):
@@ -118,9 +118,12 @@ async def send_invoice_via_whatsapp(
     2. Save to uploads/invoices/{owner_id}/{invoice_number}.pdf
     3. Build public download URL using APP_BASE_URL
     4. Update invoice: pdf_url + status = 'sent'
-    5. Send WhatsApp text + document message to customer's phone
-    Returns: { message, pdf_url, recipient_phone }
+    5. Send WhatsApp text + document message to customer's phone (if available)
+    6. Send Email with attached PDF (if available)
+    Returns: { message, pdf_url, recipient_phone, recipient_email, whatsapp_sent, email_sent, invoice }
     """
+    from app.services.email_service import send_invoice_email
+
     db = get_database()
     invoice = await invoice_service.get_invoice_by_id(invoice_id, current_owner.id, db)
     if not invoice:
@@ -156,28 +159,47 @@ async def send_invoice_via_whatsapp(
         except Exception:
             due_date_str = str(raw_due)
 
-    # 5. Send WhatsApp message (non-fatal)
+    # 5. Send messages (non-fatal)
     recipient = invoice.get("recipient_details") or {}
     to_phone = recipient.get("phone", "")
+    to_email = recipient.get("email", "")
     issuer_name = (invoice.get("issuer_details") or {}).get("name", "Transport Company")
+    
+    balance = max(0.0, float(invoice.get("total_amount", 0.0)) - float(invoice.get("paid_amount", 0.0)))
+    currency = invoice.get("currency", "INR")
+    inv_number = invoice.get("invoice_number", "")
 
     wa_sent = False
     if to_phone:
         wa_sent = await send_invoice_whatsapp(
             to_phone=to_phone,
-            invoice_number=invoice.get("invoice_number", ""),
-            balance_amount=max(0.0, float(invoice.get("total_amount", 0.0)) - float(invoice.get("paid_amount", 0.0))),
+            invoice_number=inv_number,
+            balance_amount=balance,
             due_date=due_date_str,
             pdf_url=pdf_public_url,
             company_name=issuer_name,
-            currency=invoice.get("currency", "INR"),
+            currency=currency,
+        )
+
+    email_sent = False
+    if to_email:
+        email_sent = await send_invoice_email(
+            to_email=to_email,
+            invoice_number=inv_number,
+            balance_amount=balance,
+            due_date=due_date_str,
+            pdf_path=file_path,
+            company_name=issuer_name,
+            currency=currency,
         )
 
     return {
-        "message": "Invoice PDF generated and sent via WhatsApp" if wa_sent else "PDF generated (WhatsApp not configured or no phone number)",
+        "message": "Invoice PDF generated and sent via configured channels.",
         "pdf_url": pdf_relative_url,
         "recipient_phone": to_phone or None,
+        "recipient_email": to_email or None,
         "whatsapp_sent": wa_sent,
+        "email_sent": email_sent,
         "invoice": updated,
     }
 

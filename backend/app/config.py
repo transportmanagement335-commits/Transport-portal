@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     WHATSAPP_API_TOKEN: str = ""          # Bearer token from Meta Business
     WHATSAPP_PHONE_NUMBER_ID: str = ""   # Phone Number ID from WhatsApp dashboard
 
+    # ── SMTP Email Server Config ──────────────────────────────────────────────
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+
     # ── Invoice defaults ──────────────────────────────────────────────────────
     DEFAULT_TAX_RATE: float = 0.0        # Default GST / tax rate (%)
     DEFAULT_PAYMENT_TERMS_DAYS: int = 30 # Default payment due days

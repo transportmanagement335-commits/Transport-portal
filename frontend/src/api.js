@@ -198,6 +198,32 @@ export const vehiclesAPI = {
 export const adminAPI = {
   stats:          () => apiFetch("/admin/stats"),
   recentActivity: () => apiFetch("/admin/recent-activity"),
+  get:            (path) => apiFetch(path),
+};
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+export const reportsAPI = {
+  getBusinessReport: (range) => apiFetch(`/reports/business?range=${encodeURIComponent(range)}`),
+  downloadBusinessReportPdf: async (range) => {
+    const token = getToken();
+    const res = await fetch(`${BASE_URL}/reports/business/pdf?range=${encodeURIComponent(range)}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
+    if (!res.ok) throw new Error("Failed to download report");
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Business_Report_${range.replace(/ /g, "_")}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
 };
 
 // ─── Drivers (admin manages) ──────────────────────────────────────────────────
@@ -261,8 +287,7 @@ export const invoicesAPI = {
   get:             (id)           => apiFetch(`/invoices/${id}`),
   create:          (body)         => apiFetch("/invoices/", { method: "POST", body: JSON.stringify(body) }),
   update:          (id, body)     => apiFetch(`/invoices/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-  send:            (id)           => apiFetch(`/invoices/${id}/send`, { method: "POST" }),
-  sendWhatsApp:    (id)           => apiFetch(`/invoices/send-whatsapp/${id}`, { method: "POST" }),
+  sendInvoice:     (id)           => apiFetch(`/invoices/send/${id}`, { method: "POST" }),
   recordPayment:   (id, body)     => apiFetch(`/invoices/${id}/payment`, { method: "POST", body: JSON.stringify(body) }),
   delete:          (id)           => apiFetch(`/invoices/${id}`, { method: "DELETE" }),
   fromTrip:        (tripId)       => apiFetch(`/invoices/from-trip/${tripId}`, { method: "POST" }),
