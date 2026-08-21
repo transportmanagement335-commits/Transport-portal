@@ -40,6 +40,9 @@ class VehicleInDB(BaseModel):
     seating_capacity: Optional[str] = None
     amenities: list[str] = Field(default_factory=list)
     is_ac: Optional[bool] = None
+    current_km: int = 0
+    engine_no: Optional[str] = None
+    chassis_no: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

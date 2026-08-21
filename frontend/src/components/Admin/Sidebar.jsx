@@ -7,6 +7,7 @@ import {
   FiTruck,
   FiUsers,
   FiMap,
+  FiTool ,
   FiFileText,
   FiCreditCard,
   FiSettings,
@@ -32,6 +33,11 @@ function Sidebar({ sidebarOpen }) {
       name: "Vehicles",
       path: "/vehicles",
       icon: <FiTruck />,
+    },
+    {
+      name: "Maintenance",
+      path: "/Maintenance",
+      icon: <FiTool  />,
     },
     {
       name: "Drivers",
