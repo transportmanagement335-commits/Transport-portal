@@ -2,11 +2,16 @@
 Report service — aggregates real business data from MongoDB for the
 Business Report page.
 
-Computes:
-  • KPI cards (revenue, expense, profit, trips, margin — with month-over-month trends)
-  • Monthly trend chart data (revenue, expense, profit per month)
-  • Top-performing clients, vehicles, and drivers
-  • AI-generated business insights
+Data model (single source of truth):
+  Revenue  → payments collection (actual money received, by created_at)
+  Expenses → expenses collection (actual costs incurred, by date)
+  Trips    → trips collection (for trip counts and vehicle/driver analytics)
+  Profit   → Revenue − Expenses
+
+This means:
+  - Payments entered on the Payments page are included in revenue
+  - Expenses entered on the Expenses page are included in costs
+  - A user never has to enter data in multiple places
 """
 from datetime import datetime, timedelta
 from calendar import monthrange
@@ -21,8 +26,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 def _parse_range(range_filter: str):
     """
-    Return (current_start, current_end, prev_start, prev_end) datetimes
-    for the selected date range.
+    Return (current_start, current_end, prev_start, prev_end) datetimes.
+    Comparison period is the equivalent window immediately before the current one.
     """
     now = datetime.utcnow()
     year = now.year
@@ -32,7 +37,6 @@ def _parse_range(range_filter: str):
         cur_start = datetime(year, month, 1)
         _, last_day = monthrange(year, month)
         cur_end = datetime(year, month, last_day, 23, 59, 59)
-        # Previous month
         if month == 1:
             prev_start = datetime(year - 1, 12, 1)
             prev_end = datetime(year - 1, 12, 31, 23, 59, 59)
@@ -61,22 +65,33 @@ def _parse_range(range_filter: str):
                 prev_end = datetime(year, month - 2, prev_last, 23, 59, 59)
 
     elif range_filter == "Last 3 Months":
-        cur_end = datetime(year, month, monthrange(year, month)[1], 23, 59, 59)
-        # Go back 3 months
-        m = month - 2
-        y = year
-        if m <= 0:
-            m += 12
-            y -= 1
-        cur_start = datetime(y, m, 1)
-        # Previous 3-month window
-        m2 = m - 3
-        y2 = y
-        if m2 <= 0:
-            m2 += 12
-            y2 -= 1
-        prev_start = datetime(y2, m2, 1)
-        prev_end = cur_start - timedelta(seconds=1)
+        # Current: 3 full months back to end of last month
+        if month == 1:
+            cur_end = datetime(year - 1, 12, 31, 23, 59, 59)
+            cur_start = datetime(year - 1, 10, 1)
+            prev_start = datetime(year - 1, 7, 1)
+            prev_end = datetime(year - 1, 9, 30, 23, 59, 59)
+        else:
+            # end of last month
+            last_m = month - 1 if month > 1 else 12
+            last_y = year if month > 1 else year - 1
+            _, last_day = monthrange(last_y, last_m)
+            cur_end = datetime(last_y, last_m, last_day, 23, 59, 59)
+            # start 3 months before that
+            start_m = last_m - 2
+            start_y = last_y
+            if start_m <= 0:
+                start_m += 12
+                start_y -= 1
+            cur_start = datetime(start_y, start_m, 1)
+            # prev period = 3 months before cur_start
+            prev_end = cur_start - timedelta(seconds=1)
+            prev_m = start_m - 3
+            prev_y = start_y
+            if prev_m <= 0:
+                prev_m += 12
+                prev_y -= 1
+            prev_start = datetime(prev_y, prev_m, 1)
 
     elif range_filter == "This Year":
         cur_start = datetime(year, 1, 1)
@@ -85,7 +100,7 @@ def _parse_range(range_filter: str):
         prev_end = datetime(year - 1, 12, 31, 23, 59, 59)
 
     else:
-        # Default to This Month
+        # Default: This Month
         cur_start = datetime(year, month, 1)
         _, last_day = monthrange(year, month)
         cur_end = datetime(year, month, last_day, 23, 59, 59)
@@ -101,135 +116,130 @@ def _parse_range(range_filter: str):
 
 
 def _pct_change(current: float, previous: float) -> Optional[float]:
-    """Compute percentage change, returning None if previous is zero."""
+    """Percentage change vs previous period. Returns None if previous is 0."""
     if previous == 0:
         return None
     return round(((current - previous) / abs(previous)) * 100, 1)
 
 
-MONTH_LABELS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-]
+MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Core aggregation
+# Revenue: payments collection (actual money received)
 # ──────────────────────────────────────────────────────────────────────────────
 
-async def _sum_trip_revenue(owner_id: str, start: datetime, end: datetime, db: AsyncIOMotorDatabase) -> float:
-    """Sum trip_cost for all trips in the date range.
-    Uses reporting_time as the canonical date for a trip.
-    Falls back to trip_cost first, then balance_amount + amount_paid.
+async def _sum_revenue(owner_id: str, start: datetime, end: datetime, db: AsyncIOMotorDatabase) -> float:
+    """
+    Total revenue = sum of all payments received in the date window.
+    Uses payments.created_at as the date field.
     """
     pipeline = [
         {"$match": {
             "owner_id": owner_id,
-            "reporting_time": {"$gte": start, "$lte": end},
-        }},
-        {"$group": {
-            "_id": None,
-            "total": {"$sum": {
-                "$cond": [
-                    {"$and": [
-                        {"$ne": [{"$type": "$trip_cost"}, "missing"]},
-                        {"$gt": ["$trip_cost", 0]},
-                    ]},
-                    "$trip_cost",
-                    {"$add": [
-                        {"$ifNull": ["$balance_amount", 0]},
-                        {"$ifNull": ["$amount_paid", 0]},
-                    ]},
-                ],
-            }},
-        }},
-    ]
-    result = await db.trips.aggregate(pipeline).to_list(length=1)
-    return result[0]["total"] if result else 0.0
-
-
-async def _sum_expenses(owner_id: str, start: datetime, end: datetime, db: AsyncIOMotorDatabase) -> float:
-    """Sum expense amounts in the date range."""
-    pipeline = [
-        {"$match": {
-            "owner_id": owner_id,
-            "date": {"$gte": start, "$lte": end},
+            "created_at": {"$gte": start, "$lte": end},
         }},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
     ]
+    result = await db.payments.aggregate(pipeline).to_list(length=1)
+    return float(result[0]["total"]) if result else 0.0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Expenses: expenses collection
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def _sum_expenses(owner_id: str, start: datetime, end: datetime, db: AsyncIOMotorDatabase) -> float:
+    """
+    Total expenses = sum of all expense entries in the date window.
+    Uses expenses.date as the authoritative date; falls back to created_at if date is null.
+    Uses $addFields to pick one date per document — no double-counting.
+    """
+    pipeline = [
+        {"$match": {"owner_id": owner_id}},
+        {"$addFields": {"eff_date": {"$ifNull": ["$date", "$created_at"]}}},
+        {"$match": {"eff_date": {"$gte": start, "$lte": end}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]
     result = await db.expenses.aggregate(pipeline).to_list(length=1)
-    return result[0]["total"] if result else 0.0
+    return float(result[0]["total"]) if result else 0.0
 
 
-async def _count_completed_trips(owner_id: str, start: datetime, end: datetime, db: AsyncIOMotorDatabase) -> int:
-    """Count completed trips in the date range."""
+# ──────────────────────────────────────────────────────────────────────────────
+# Trip counts: trips collection
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def _count_trips(owner_id: str, start: datetime, end: datetime, db: AsyncIOMotorDatabase) -> int:
+    """
+    Count trips in the period. Uses reporting_time first, falls back to created_at.
+    Counts all trips (not just completed) to represent business volume.
+    """
     return await db.trips.count_documents({
         "owner_id": owner_id,
-        "reporting_time": {"$gte": start, "$lte": end},
-        "trip_status": {"$in": ["Completed", "On Trip", "Scheduled"]},
+        "$or": [
+            {"reporting_time": {"$gte": start, "$lte": end}},
+            {"created_at": {"$gte": start, "$lte": end}},
+        ],
     })
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Monthly trend data
+# Monthly trend: by calendar month across the selected range
 # ──────────────────────────────────────────────────────────────────────────────
 
 async def _monthly_trend(owner_id: str, start: datetime, end: datetime, db: AsyncIOMotorDatabase) -> list:
     """
-    Build monthly revenue / expense / profit array for the line chart.
-    Returns list of {month, revenue, expense, profit}.
+    Monthly breakdown of revenue (from payments), expenses, and profit.
+    Each entry = {month, revenue, expense, profit}.
     """
-    # Revenue by month
+    # Revenue by month (from payments.created_at)
     rev_pipeline = [
         {"$match": {
             "owner_id": owner_id,
-            "reporting_time": {"$gte": start, "$lte": end},
+            "created_at": {"$gte": start, "$lte": end},
         }},
         {"$group": {
-            "_id": {"$month": "$reporting_time"},
-            "total": {"$sum": {
-                "$cond": [
-                    {"$and": [
-                        {"$ne": [{"$type": "$trip_cost"}, "missing"]},
-                        {"$gt": ["$trip_cost", 0]},
-                    ]},
-                    "$trip_cost",
-                    {"$add": [
-                        {"$ifNull": ["$balance_amount", 0]},
-                        {"$ifNull": ["$amount_paid", 0]},
-                    ]},
-                ],
-            }},
-        }},
-    ]
-    rev_docs = await db.trips.aggregate(rev_pipeline).to_list(length=12)
-    rev_map = {d["_id"]: d["total"] for d in rev_docs}
-
-    # Expenses by month
-    exp_pipeline = [
-        {"$match": {
-            "owner_id": owner_id,
-            "date": {"$gte": start, "$lte": end},
-        }},
-        {"$group": {
-            "_id": {"$month": "$date"},
+            "_id": {
+                "year": {"$year": "$created_at"},
+                "month": {"$month": "$created_at"},
+            },
             "total": {"$sum": "$amount"},
         }},
     ]
-    exp_docs = await db.expenses.aggregate(exp_pipeline).to_list(length=12)
-    exp_map = {d["_id"]: d["total"] for d in exp_docs}
+    rev_docs = await db.payments.aggregate(rev_pipeline).to_list(length=24)
+    rev_map = {(d["_id"]["year"], d["_id"]["month"]): d["total"] for d in rev_docs}
 
-    # Build array for every month in the range
-    start_month = start.month
-    start_year = start.year
-    end_month = end.month
-    end_year = end.year
+    # Expenses by month (from expenses.date or created_at)
+    exp_pipeline = [
+        {"$match": {
+            "owner_id": owner_id,
+            "$or": [
+                {"date": {"$gte": start, "$lte": end}},
+                {"created_at": {"$gte": start, "$lte": end}},
+            ],
+        }},
+        {"$addFields": {
+            "eff_date": {"$ifNull": ["$date", "$created_at"]},
+        }},
+        {"$group": {
+            "_id": {
+                "year": {"$year": "$eff_date"},
+                "month": {"$month": "$eff_date"},
+            },
+            "total": {"$sum": "$amount"},
+        }},
+    ]
+    exp_docs = await db.expenses.aggregate(exp_pipeline).to_list(length=24)
+    exp_map = {(d["_id"]["year"], d["_id"]["month"]): d["total"] for d in exp_docs}
 
+    # Build month-by-month array
     trend = []
-    y, m = start_year, start_month
-    while (y, m) <= (end_year, end_month):
-        rev = round(rev_map.get(m, 0), 2)
-        exp = round(exp_map.get(m, 0), 2)
+    y, m = start.year, start.month
+    end_key = (end.year, end.month)
+    while (y, m) <= end_key:
+        rev = round(rev_map.get((y, m), 0), 2)
+        exp = round(exp_map.get((y, m), 0), 2)
         trend.append({
             "month": MONTH_LABELS[m - 1],
             "revenue": rev,
@@ -245,7 +255,7 @@ async def _monthly_trend(owner_id: str, start: datetime, end: datetime, db: Asyn
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Top performers
+# Top Clients: from payments collection (actual revenue per client)
 # ──────────────────────────────────────────────────────────────────────────────
 
 async def _top_clients(
@@ -257,97 +267,88 @@ async def _top_clients(
     db: AsyncIOMotorDatabase,
     limit: int = 5,
 ) -> list:
-    """Top clients ranked by revenue in the current period."""
+    """Top clients ranked by actual payments received in the current period."""
+    # Current period: group payments by client_name
     pipeline = [
         {"$match": {
             "owner_id": owner_id,
-            "reporting_time": {"$gte": cur_start, "$lte": cur_end},
+            "created_at": {"$gte": cur_start, "$lte": cur_end},
         }},
         {"$group": {
             "_id": "$client_name",
-            "trips": {"$sum": 1},
-            "revenue": {"$sum": {
-                "$cond": [
-                    {"$and": [
-                        {"$ne": [{"$type": "$trip_cost"}, "missing"]},
-                        {"$gt": ["$trip_cost", 0]},
-                    ]},
-                    "$trip_cost",
-                    {"$add": [
-                        {"$ifNull": ["$balance_amount", 0]},
-                        {"$ifNull": ["$amount_paid", 0]},
-                    ]},
-                ],
-            }},
+            "revenue": {"$sum": "$amount"},
+            "transactions": {"$sum": 1},
         }},
         {"$sort": {"revenue": -1}},
         {"$limit": limit},
     ]
-    cur_docs = await db.trips.aggregate(pipeline).to_list(length=limit)
+    cur_docs = await db.payments.aggregate(pipeline).to_list(length=limit)
 
-    # Get previous period revenues for growth calculation
+    # Previous period revenue per client (for growth calc)
     prev_pipeline = [
         {"$match": {
             "owner_id": owner_id,
-            "reporting_time": {"$gte": prev_start, "$lte": prev_end},
+            "created_at": {"$gte": prev_start, "$lte": prev_end},
         }},
         {"$group": {
             "_id": "$client_name",
-            "revenue": {"$sum": {
-                "$cond": [
-                    {"$and": [
-                        {"$ne": [{"$type": "$trip_cost"}, "missing"]},
-                        {"$gt": ["$trip_cost", 0]},
-                    ]},
-                    "$trip_cost",
-                    {"$add": [
-                        {"$ifNull": ["$balance_amount", 0]},
-                        {"$ifNull": ["$amount_paid", 0]},
-                    ]},
-                ],
-            }},
+            "revenue": {"$sum": "$amount"},
         }},
     ]
-    prev_docs = await db.trips.aggregate(prev_pipeline).to_list(length=100)
+    prev_docs = await db.payments.aggregate(prev_pipeline).to_list(length=100)
     prev_map = {d["_id"]: d["revenue"] for d in prev_docs}
 
-    # Get expenses per client (using trip_id linkage)
-    client_expenses = {}
-    for c in cur_docs:
-        client_name = c["_id"]
-        # Find trip IDs for this client
-        trip_ids_cursor = db.trips.find(
-            {
-                "owner_id": owner_id,
-                "client_name": client_name,
-                "reporting_time": {"$gte": cur_start, "$lte": cur_end},
-            },
-            {"_id": 1},
-        )
-        trip_ids = []
-        async for t in trip_ids_cursor:
-            trip_ids.append(str(t["_id"]))
+    # Count trips per client in current period
+    trip_pipeline = [
+        {"$match": {
+            "owner_id": owner_id,
+            "$or": [
+                {"reporting_time": {"$gte": cur_start, "$lte": cur_end}},
+                {"created_at": {"$gte": cur_start, "$lte": cur_end}},
+            ],
+        }},
+        {"$group": {
+            "_id": "$client_name",
+            "trips": {"$sum": 1},
+        }},
+    ]
+    trip_docs = await db.trips.aggregate(trip_pipeline).to_list(length=100)
+    trips_map = {d["_id"]: d["trips"] for d in trip_docs}
 
-        if trip_ids:
-            exp_result = await db.expenses.aggregate([
-                {"$match": {"owner_id": owner_id, "trip_id": {"$in": trip_ids}}},
-                {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
-            ]).to_list(length=1)
-            client_expenses[client_name] = exp_result[0]["total"] if exp_result else 0
-        else:
-            client_expenses[client_name] = 0
-
+    # Get expenses linked to each client's trips
     results = []
     for c in cur_docs:
-        name = c["_id"]
+        name = c["_id"] or "Unknown Client"
         revenue = round(c["revenue"], 2)
-        expense = round(client_expenses.get(name, 0), 2)
+        trips = trips_map.get(name, 0)
+
+        # Find trip_ids for this client to get related expenses
+        trip_ids_list = []
+        async for t in db.trips.find(
+            {"owner_id": owner_id, "client_name": name,
+             "$or": [
+                 {"reporting_time": {"$gte": cur_start, "$lte": cur_end}},
+                 {"created_at": {"$gte": cur_start, "$lte": cur_end}},
+             ]},
+            {"_id": 1},
+        ):
+            trip_ids_list.append(str(t["_id"]))
+
+        expense = 0.0
+        if trip_ids_list:
+            exp_result = await db.expenses.aggregate([
+                {"$match": {"owner_id": owner_id, "trip_id": {"$in": trip_ids_list}}},
+                {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+            ]).to_list(length=1)
+            expense = float(exp_result[0]["total"]) if exp_result else 0.0
+
         profit = round(revenue - expense, 2)
         prev_rev = prev_map.get(name, 0)
         growth = _pct_change(revenue, prev_rev)
+
         results.append({
-            "name": name or "Unknown Client",
-            "trips": c["trips"],
+            "name": name,
+            "trips": trips,
             "revenue": revenue,
             "profit": profit,
             "growth": growth if growth is not None else 0,
@@ -356,6 +357,10 @@ async def _top_clients(
     return results
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Top Vehicles: from trips + payments linked by trip_id
+# ──────────────────────────────────────────────────────────────────────────────
+
 async def _top_vehicles(
     owner_id: str,
     cur_start: datetime,
@@ -363,22 +368,25 @@ async def _top_vehicles(
     db: AsyncIOMotorDatabase,
     limit: int = 5,
 ) -> list:
-    """Top vehicles ranked by revenue in the current period."""
+    """Top vehicles ranked by revenue (from payments linked to their trips)."""
+    # Get trips in the period grouped by vehicle
     pipeline = [
         {"$match": {
             "owner_id": owner_id,
-            "reporting_time": {"$gte": cur_start, "$lte": cur_end},
+            "$or": [
+                {"reporting_time": {"$gte": cur_start, "$lte": cur_end}},
+                {"created_at": {"$gte": cur_start, "$lte": cur_end}},
+            ],
         }},
         {"$group": {
             "_id": "$vehicle_number",
             "vehicle_id": {"$first": "$vehicle_id"},
             "trips": {"$sum": 1},
+            "trip_ids": {"$push": {"$toString": "$_id"}},
+            # Use trip_cost as proxy revenue per vehicle (payments are per client, not vehicle)
             "revenue": {"$sum": {
                 "$cond": [
-                    {"$and": [
-                        {"$ne": [{"$type": "$trip_cost"}, "missing"]},
-                        {"$gt": ["$trip_cost", 0]},
-                    ]},
+                    {"$gt": [{"$ifNull": ["$trip_cost", 0]}, 0]},
                     "$trip_cost",
                     {"$add": [
                         {"$ifNull": ["$balance_amount", 0]},
@@ -392,32 +400,34 @@ async def _top_vehicles(
     ]
     docs = await db.trips.aggregate(pipeline).to_list(length=limit)
 
-    # Total trips in the period for utilization calculation
     total_days = max((cur_end - cur_start).days, 1)
 
     results = []
     for v in docs:
-        vehicle_no = v["_id"]
-        revenue = round(v["revenue"], 2)
+        vehicle_no = v["_id"] or "Unknown"
+        revenue = round(float(v["revenue"]), 2)
+        trip_ids_list = v.get("trip_ids", [])
 
-        # Compute expenses for this vehicle in the period
+        # Expenses for this vehicle in the period
+        vid = v.get("vehicle_id", "")
         exp_result = await db.expenses.aggregate([
             {"$match": {
                 "owner_id": owner_id,
-                "vehicle_id": v.get("vehicle_id", ""),
-                "date": {"$gte": cur_start, "$lte": cur_end},
+                "vehicle_id": vid,
+                "$or": [
+                    {"date": {"$gte": cur_start, "$lte": cur_end}},
+                    {"created_at": {"$gte": cur_start, "$lte": cur_end}},
+                ],
             }},
             {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
         ]).to_list(length=1)
-        expense = exp_result[0]["total"] if exp_result else 0
+        expense = float(exp_result[0]["total"]) if exp_result else 0.0
         profit = round(revenue - expense, 2)
 
-        # Utilization: (trip_days / total_days) * 100
-        # Approximate each trip as 1 day (or use actual started_at/completed_at if available)
         utilization = min(round((v["trips"] / total_days) * 100, 1), 100)
 
         results.append({
-            "vehicleNo": vehicle_no or "Unknown",
+            "vehicleNo": vehicle_no,
             "trips": v["trips"],
             "revenue": revenue,
             "profit": profit,
@@ -426,6 +436,10 @@ async def _top_vehicles(
 
     return results
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Top Drivers: from trips collection
+# ──────────────────────────────────────────────────────────────────────────────
 
 async def _top_drivers(
     owner_id: str,
@@ -438,7 +452,10 @@ async def _top_drivers(
     pipeline = [
         {"$match": {
             "owner_id": owner_id,
-            "reporting_time": {"$gte": cur_start, "$lte": cur_end},
+            "$or": [
+                {"reporting_time": {"$gte": cur_start, "$lte": cur_end}},
+                {"created_at": {"$gte": cur_start, "$lte": cur_end}},
+            ],
         }},
         {"$group": {
             "_id": "$driver_name",
@@ -446,10 +463,7 @@ async def _top_drivers(
             "trips": {"$sum": 1},
             "revenue": {"$sum": {
                 "$cond": [
-                    {"$and": [
-                        {"$ne": [{"$type": "$trip_cost"}, "missing"]},
-                        {"$gt": ["$trip_cost", 0]},
-                    ]},
+                    {"$gt": [{"$ifNull": ["$trip_cost", 0]}, 0]},
                     "$trip_cost",
                     {"$add": [
                         {"$ifNull": ["$balance_amount", 0]},
@@ -466,29 +480,26 @@ async def _top_drivers(
 
     results = []
     for d in docs:
-        revenue = round(d["revenue"], 2)
-        km = round(d.get("kmDriven", 0), 1)
-
-        # Compute rating as a performance score:
-        # Trips completed on-time / total trips (simple proxy)
-        # Since we don't have explicit ratings, derive one from completion ratio
         total_trips = d["trips"]
-        if total_trips > 0 and d.get("driver_id"):
+        driver_id = d.get("driver_id")
+        rating = None
+        if total_trips > 0 and driver_id:
             completed = await db.trips.count_documents({
                 "owner_id": owner_id,
-                "driver_id": d["driver_id"],
+                "driver_id": driver_id,
                 "trip_status": "Completed",
-                "reporting_time": {"$gte": cur_start, "$lte": cur_end},
+                "$or": [
+                    {"reporting_time": {"$gte": cur_start, "$lte": cur_end}},
+                    {"created_at": {"$gte": cur_start, "$lte": cur_end}},
+                ],
             })
             rating = round(min((completed / total_trips) * 5, 5), 1)
-        else:
-            rating = None
 
         results.append({
             "name": d["_id"] or "Unknown Driver",
             "trips": total_trips,
-            "kmDriven": km,
-            "revenue": revenue,
+            "kmDriven": round(float(d.get("kmDriven", 0) or 0), 1),
+            "revenue": round(float(d["revenue"]), 2),
             "rating": rating,
         })
 
@@ -496,7 +507,7 @@ async def _top_drivers(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# AI Insights generator
+# AI Insights
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _generate_insights(
@@ -507,127 +518,71 @@ def _generate_insights(
     cur_revenue: float,
     cur_expense: float,
     cur_profit: float,
-    range_filter: str,
 ) -> list:
-    """
-    Generate smart AI-style business insights based on the computed data.
-    Returns a list of {text: str, type: 'success'|'warning'|'info'}.
-    """
+    """Generate contextual AI-style business insights from computed KPI data."""
     insights = []
 
-    # ── Revenue insight ────────────────────────────────────────────────────────
+    # Revenue trend
     rev_trend = kpi.get("revenueTrend")
     if rev_trend is not None:
         if rev_trend > 10:
-            insights.append({
-                "text": f"📈 Revenue is <b>up {rev_trend}%</b> compared to the previous period — strong growth momentum!",
-                "type": "success",
-            })
+            insights.append({"text": f"📈 Revenue is <b>up {rev_trend}%</b> compared to the previous period — strong growth momentum!", "type": "success"})
         elif rev_trend > 0:
-            insights.append({
-                "text": f"📈 Revenue grew by <b>{rev_trend}%</b> compared to the previous period — steady progress.",
-                "type": "success",
-            })
+            insights.append({"text": f"📈 Revenue grew by <b>{rev_trend}%</b> vs the previous period — steady progress.", "type": "success"})
         elif rev_trend < -10:
-            insights.append({
-                "text": f"📉 Revenue has <b>declined {abs(rev_trend)}%</b> compared to the previous period. Consider reviewing pricing and client acquisition strategies.",
-                "type": "warning",
-            })
+            insights.append({"text": f"📉 Revenue <b>declined {abs(rev_trend)}%</b>. Review client acquisition and pricing strategies.", "type": "warning"})
         elif rev_trend < 0:
-            insights.append({
-                "text": f"📉 Revenue dipped <b>{abs(rev_trend)}%</b> from the previous period. Monitor closely over the next period.",
-                "type": "warning",
-            })
+            insights.append({"text": f"📉 Revenue dipped <b>{abs(rev_trend)}%</b> from the previous period. Monitor closely.", "type": "warning"})
 
-    # ── Profit margin insight ──────────────────────────────────────────────────
+    # Profit margin
     margin = kpi.get("profitMargin")
     if margin is not None:
         if margin >= 30:
-            insights.append({
-                "text": f"💰 Profit margin is a healthy <b>{margin}%</b> — your operations are running efficiently.",
-                "type": "success",
-            })
-        elif margin >= 15:
-            insights.append({
-                "text": f"💰 Profit margin is <b>{margin}%</b> — decent, but look for cost optimization opportunities.",
-                "type": "info",
-            })
+            insights.append({"text": f"💰 Profit margin is a healthy <b>{margin}%</b> — operations running efficiently.", "type": "success"})
+        elif margin >= 10:
+            insights.append({"text": f"💰 Profit margin is <b>{margin}%</b> — decent, but look for cost optimizations.", "type": "info"})
         elif margin >= 0:
-            insights.append({
-                "text": f"⚠️ Profit margin is only <b>{margin}%</b> — expenses are eating into your revenue. Review fuel, driver payments, and maintenance costs.",
-                "type": "warning",
-            })
+            insights.append({"text": f"⚠️ Profit margin is only <b>{margin}%</b> — review fuel, driver payments, and maintenance costs.", "type": "warning"})
         else:
-            insights.append({
-                "text": f"🚨 You are operating at a <b>loss</b> (margin: {margin}%). Urgent cost review needed.",
-                "type": "warning",
-            })
+            insights.append({"text": f"🚨 Operating at a <b>loss</b> (margin: {margin}%). Urgent cost review needed.", "type": "warning"})
 
-    # ── Expense trend insight ──────────────────────────────────────────────────
+    # Expense spike
     exp_trend = kpi.get("expenseTrend")
     if exp_trend is not None and exp_trend > 15:
-        insights.append({
-            "text": f"🔥 Expenses have <b>increased {exp_trend}%</b> — check for unusual spikes in fuel, tolls, or repair costs.",
-            "type": "warning",
-        })
+        insights.append({"text": f"🔥 Expenses <b>increased {exp_trend}%</b> — check for spikes in fuel, tolls, or repairs.", "type": "warning"})
 
-    # ── Top client concentration ───────────────────────────────────────────────
+    # Client concentration
     if top_clients and cur_revenue > 0:
-        top_client_rev = top_clients[0].get("revenue", 0)
-        concentration = round((top_client_rev / cur_revenue) * 100, 1)
+        top_rev = top_clients[0].get("revenue", 0)
+        concentration = round((top_rev / cur_revenue) * 100, 1)
         if concentration > 50:
-            insights.append({
-                "text": f"👤 <b>{top_clients[0]['name']}</b> contributes <b>{concentration}%</b> of your revenue. High client concentration is a risk — consider diversifying.",
-                "type": "warning",
-            })
+            insights.append({"text": f"👤 <b>{top_clients[0]['name']}</b> contributes <b>{concentration}%</b> of revenue. High concentration risk — diversify.", "type": "warning"})
         elif concentration > 25 and len(top_clients) >= 2:
-            insights.append({
-                "text": f"👥 Your top 2 clients (<b>{top_clients[0]['name']}</b> and <b>{top_clients[1]['name']}</b>) drive the majority of your business.",
-                "type": "info",
-            })
+            insights.append({"text": f"👥 <b>{top_clients[0]['name']}</b> and <b>{top_clients[1]['name']}</b> are your highest revenue clients.", "type": "info"})
 
-    # ── Fleet utilization insight ──────────────────────────────────────────────
+    # Fleet utilization
     if top_vehicles:
         avg_util = sum(v.get("utilization", 0) for v in top_vehicles) / len(top_vehicles)
         if avg_util < 30:
-            insights.append({
-                "text": f"🚛 Average fleet utilization is only <b>{round(avg_util, 1)}%</b>. Consider reducing idle vehicles or finding more clients.",
-                "type": "warning",
-            })
-        elif avg_util > 75:
-            insights.append({
-                "text": f"🚛 Fleet utilization is at <b>{round(avg_util, 1)}%</b> — your vehicles are well-deployed!",
-                "type": "success",
-            })
+            insights.append({"text": f"🚛 Fleet utilization is only <b>{round(avg_util, 1)}%</b> — consider reducing idle vehicles or acquiring more clients.", "type": "warning"})
+        elif avg_util > 70:
+            insights.append({"text": f"🚛 Fleet utilization at <b>{round(avg_util, 1)}%</b> — vehicles are well-deployed!", "type": "success"})
 
-    # ── Driver performance insight ─────────────────────────────────────────────
+    # Top driver
     if top_drivers:
-        top_driver = top_drivers[0]
-        if top_driver.get("rating") and top_driver["rating"] >= 4.5:
-            insights.append({
-                "text": f"⭐ <b>{top_driver['name']}</b> is your top performer with <b>{top_driver['trips']}</b> trips and a <b>{top_driver['rating']}</b> rating.",
-                "type": "success",
-            })
-        elif top_driver.get("trips", 0) > 0:
-            insights.append({
-                "text": f"🚗 <b>{top_driver['name']}</b> leads with <b>{top_driver['trips']}</b> trips this period.",
-                "type": "info",
-            })
+        d = top_drivers[0]
+        if d.get("trips", 0) > 0:
+            insights.append({"text": f"🚗 <b>{d['name']}</b> leads with <b>{d['trips']}</b> trips this period.", "type": "info"})
 
-    # ── Trip growth insight ────────────────────────────────────────────────────
+    # Trip growth
     trips_trend = kpi.get("tripsTrend")
     if trips_trend is not None and trips_trend > 20:
-        insights.append({
-            "text": f"📊 Trip volume has <b>grown {trips_trend}%</b> — your business is scaling well!",
-            "type": "success",
-        })
+        insights.append({"text": f"📊 Trip volume grew <b>{trips_trend}%</b> — business is scaling well!", "type": "success"})
 
-    # Fallback if no insights
-    if not insights:
-        insights.append({
-            "text": "📊 Not enough historical data to generate insights for this period. Keep logging trips and expenses for richer analytics.",
-            "type": "info",
-        })
+    if cur_revenue == 0 and cur_expense == 0:
+        insights.append({"text": "📊 No payments or expenses recorded in this period. Make sure to log trips, receive payments, and record expenses.", "type": "info"})
+    elif not insights:
+        insights.append({"text": "📊 Business is stable this period. Keep logging trips and expenses for richer trend insights.", "type": "info"})
 
     return insights
 
@@ -638,34 +593,27 @@ def _generate_insights(
 
 async def get_business_report(owner_id: str, range_filter: str, db: AsyncIOMotorDatabase) -> dict:
     """
-    Build the complete business report response expected by BusinessReport.jsx.
+    Build the complete business report for BusinessReport.jsx.
 
-    Response shape:
-    {
-        kpi: { totalRevenue, revenueTrend, totalExpense, expenseTrend,
-               totalProfit, profitTrend, tripsCompleted, tripsTrend,
-               profitMargin, marginTrend },
-        trend: [ { month, revenue, expense, profit }, ... ],
-        aiInsights: [ { text, type }, ... ],
-        topClients: [ { name, trips, revenue, profit, growth }, ... ],
-        topVehicles: [ { vehicleNo, trips, revenue, profit, utilization }, ... ],
-        topDrivers: [ { name, trips, kmDriven, revenue, rating }, ... ],
-    }
+    Revenue  = payments.amount (actual cash/UPI received)
+    Expenses = expenses.amount (fuel, tolls, repairs, driver pay, etc.)
+    Profit   = Revenue - Expenses
+    Trips    = count of trips in the period (for KPI and analytics)
     """
     cur_start, cur_end, prev_start, prev_end = _parse_range(range_filter)
 
-    # ── Current period KPIs ────────────────────────────────────────────────────
-    cur_revenue = await _sum_trip_revenue(owner_id, cur_start, cur_end, db)
+    # ── Current period ──────────────────────────────────────────────────────
+    cur_revenue = await _sum_revenue(owner_id, cur_start, cur_end, db)
     cur_expense = await _sum_expenses(owner_id, cur_start, cur_end, db)
     cur_profit = cur_revenue - cur_expense
-    cur_trips = await _count_completed_trips(owner_id, cur_start, cur_end, db)
+    cur_trips = await _count_trips(owner_id, cur_start, cur_end, db)
     cur_margin = round((cur_profit / cur_revenue) * 100, 1) if cur_revenue > 0 else 0
 
-    # ── Previous period KPIs ───────────────────────────────────────────────────
-    prev_revenue = await _sum_trip_revenue(owner_id, prev_start, prev_end, db)
+    # ── Previous period ─────────────────────────────────────────────────────
+    prev_revenue = await _sum_revenue(owner_id, prev_start, prev_end, db)
     prev_expense = await _sum_expenses(owner_id, prev_start, prev_end, db)
     prev_profit = prev_revenue - prev_expense
-    prev_trips = await _count_completed_trips(owner_id, prev_start, prev_end, db)
+    prev_trips = await _count_trips(owner_id, prev_start, prev_end, db)
     prev_margin = round((prev_profit / prev_revenue) * 100, 1) if prev_revenue > 0 else 0
 
     kpi = {
@@ -681,20 +629,16 @@ async def get_business_report(owner_id: str, range_filter: str, db: AsyncIOMotor
         "marginTrend": _pct_change(cur_margin, prev_margin) if prev_margin != 0 else None,
     }
 
-    # ── Monthly trend ──────────────────────────────────────────────────────────
+    # ── Monthly trend chart ─────────────────────────────────────────────────
     trend = await _monthly_trend(owner_id, cur_start, cur_end, db)
 
-    # ── Top performers ─────────────────────────────────────────────────────────
+    # ── Top performers ──────────────────────────────────────────────────────
     clients = await _top_clients(owner_id, cur_start, cur_end, prev_start, prev_end, db)
     vehicles = await _top_vehicles(owner_id, cur_start, cur_end, db)
     drivers = await _top_drivers(owner_id, cur_start, cur_end, db)
 
-    # ── AI insights ────────────────────────────────────────────────────────────
-    ai_insights = _generate_insights(
-        kpi, clients, vehicles, drivers,
-        cur_revenue, cur_expense, cur_profit,
-        range_filter,
-    )
+    # ── AI insights ─────────────────────────────────────────────────────────
+    ai_insights = _generate_insights(kpi, clients, vehicles, drivers, cur_revenue, cur_expense, cur_profit)
 
     return {
         "kpi": kpi,
