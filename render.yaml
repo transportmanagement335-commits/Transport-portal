@@ -5,10 +5,12 @@ services:
     name: transport-portal-backend
     env: python
     plan: free # Deploys on Render's Free tier
-    rootDirectory: backend
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
       - key: MONGO_URI
         sync: false # Render will prompt you to enter your MongoDB connection string
       - key: MONGO_DB_NAME
